@@ -1,0 +1,62 @@
+name: Solidity Base CI
+
+on:
+  workflow_call:
+    inputs:
+      disable-gas-snapshot:
+        description: 'Disable failing the build on .gas-snapshot diff'
+        required: false
+        default: false
+        type: boolean
+      gas-diff-tolerance:
+        description: 'tolerance for gas diff'
+        required: false
+        default: 1
+        type: number
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  repository-projects: read
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  check:
+    strategy:
+      fail-fast: true
+
+    name: Solidity Base CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          token: ${{ secrets.CI_GITHUB_TOKEN }}
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build --sizes
+        id: build
+
+      - name: Run Forge fmtx  
+        run: |
+          forge fmt --check
+        id: fmt
+
+      - name: Run Forge tests
+        run: |
+          forge test -vvv
+        id: test
+      # do not run if disable-gas-snapshot is true
+      - name: Compare gas reports
+        if: ${{ !inputs.disable-gas-snapshot }}
+        run: |
+          FOUNDRY_PROFILE=snapshot forge snapshot --check --silent --tolerance ${{ inputs.gas-diff-tolerance }}
+        id: gas-snapshot

@@ -1,0 +1,20 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches:
+    - main
+  workflow_dispatch:
+
+
+# this example uses two parallel jobs, one to handle solidity compilation and one to handle static analysis
+# the with: keyword allows you to pass in parameters to the action
+# and the input in the example will disable the divide before multiply check
+jobs:
+  solidity-base:
+    uses: init4tech/actions/.github/workflows/solidity-base.yml@main
+    secrets: inherit
+  static-analysis-base:
+    uses: init4tech/actions/.github/workflows/solidity-static-analysis.yml@main
+    with:
+      disable-divide-before-multiply: true
