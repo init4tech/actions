@@ -1,0 +1,18 @@
+name: CI # Continuous Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# simplest example of using the hugo-build-deploy action
+jobs:
+  hugo-ci:
+    uses: init4tech/actions/.github/workflows/hugo-build-deploy.yml@main
+    with:
+      hugo-src-dir: 'init4'
+      hugo-theme: 'papermod'
+      environment: 'dev'
+      aws-iam-deployer-role: 'arn:aws:iam::123456789012:role/DeployerRole'
+      aws-s3-bucket: 'my-s3-bucket'
+      aws-region: 'us-east-1'

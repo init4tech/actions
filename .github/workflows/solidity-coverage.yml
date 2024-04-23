@@ -1,0 +1,29 @@
+name: Code Coverage
+
+on:
+  workflow_call:
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  check:
+    strategy:
+      fail-fast: true
+
+    name: Check Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          token: ${{ secrets.CI_GITHUB_TOKEN }}
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Generate Code Coverage Report
+        run: |
+          forge coverage --ir-minimum --report summary --silent > summary-gen.txt
+          cat summary-gen.txt | grep -e test\/ -v | grep -e script\/ -v | grep -e BytesLib -v | grep -v -e Total  | grep -v -e "Compiling \d* files with" -v | grep -e "Compiler run " -v | grep -e "Solc \d\.\d\.\d\d finished in" -v | grep -e "Wrote LCOV report" -v > report-gen.txt 
+          cat report-gen.txt
+          diff -u .coverage-report report-gen.txt
+        id: coverage

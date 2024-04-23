@@ -1,0 +1,88 @@
+name: Slither Analysis
+on:
+  workflow_call:
+    inputs:
+      disable-divide-before-multiply:
+        description: 'skip divide before multiply'
+        required: false
+        default: false
+        type: boolean
+      disable-encode-packed-collision:
+        description: 'skip abi.encodepacked() collision checks'
+        required: false
+        default: false
+        type: boolean
+      disable-arbitrary-send-erc20:
+        description: 'skip arbitrary send checks'
+        required: false
+        default: false
+        type: boolean
+      disable-array-by-reference:
+        description: 'skip storage array by value modification checks'
+        required: false
+        default: false
+        type: boolean
+      disable-tautology:
+        description: 'skip tautology checks'
+        required: false
+        default: false
+        type: boolean
+      # May be removed soon as per the removal of the selfdestruct opcode
+      disable-suicidal:
+        description: 'skip suicidal'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  slither-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build --build-info
+        id: build
+      - name: Install Slither
+        run: |
+          pip3 install slither-analyzer
+      - name: Run detector divide-before-multiply
+        if: ${{ !inputs.disable-divide-before-multiply }}
+        run : |
+          slither --version
+          slither . --detect=divide-before-multiply --ignore-compile --fail-high 
+      - name: Run detector encode-packed-collision
+        if: ${{ !inputs.disable-encode-packed-collision }}
+        run : |
+          slither --version
+          slither . --detect=encode-packed-collision --ignore-compile --fail-high
+      - name: Run detector arbitrary-send-erc20
+        if: ${{ !inputs.disable-arbitrary-send-erc20 }}
+        run : | 
+          slither --version
+          slither . --detect=arbitrary-send-erc20 --ignore-compile --fail-high
+      - name: Run detector array-by-reference
+        if: ${{ !inputs.disable-array-by-reference }}
+        run : |
+          slither --version
+          slither . --detect=array-by-reference --ignore-compile --fail-high
+      - name: Run detector tautology
+        if: ${{ !inputs.disable-tautology }}
+        run : |
+          slither --version
+          slither . --detect=tautology --ignore-compile --fail-high
+      - name: Run detector suicidal
+        if: ${{ !inputs.disable-suicidal }}
+        run : | 
+          slither --version
+          slither . --detect=suicidal --ignore-compile --fail-high
+      

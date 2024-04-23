@@ -1,0 +1,76 @@
+name: Hugo s3 deploy 
+
+on:
+  workflow_call:
+    inputs:
+      hugo-src-dir:
+        description: 'Hugo source directory'
+        required: true
+        type: string
+      hugo-theme:
+        description: 'Hugo theme to use'
+        required: true
+        type: string
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: string
+      aws-iam-deployer-role:
+        description: 'Role ARN to assume for ECR'
+        required: true
+        type: string
+      aws-s3-bucket:
+        description: 'S3 bucket to deploy to'
+        required: true
+        type: string
+      aws-region:
+        description: 'AWS region'
+        required: true
+        type: string
+        default: 'us-east-1'
+        
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read  # This is required for actions/checkout
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                submodules: recursive
+            - name: Install Hugo CLI
+              run: |
+                sudo snap install hugo
+            - name: Build
+              run: hugo --minify --destination dist --source ${{inputs.hugo-src-dir}} --theme ${{ inputs.hugo-theme }}
+            - name: Archive build directory
+              uses: actions/upload-artifact@v3
+              with:
+                name: dist
+                path: ${{ inputs.hugo-src-dir }}/dist
+    deploy-prod: 
+        environment: 
+          name: ${{ inputs.environment }}
+        # only runs when the branch is main
+        if: github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        needs: build
+        steps:
+            - name: Download build artifact
+              uses: actions/download-artifact@v3
+              with:
+                name: dist
+            - name: Configure AWS credentials 
+              uses: aws-actions/configure-aws-credentials@v4
+              with: 
+                role-to-assume: ${{ inputs.aws-iam-deployer-role }}
+                role-session-name: github_federated_aws
+                aws-region: ${{ inputs.aws-region }}
+            - name: Deploy Site to S3
+              env: 
+                AWS_S3_BUCKET : ${{ secrets.AWS_S3_BUCKET }}
+              run: |
+                aws s3 sync --delete --sse AES256 /home/runner/work/.github/.github $AWS_S3_BUCKET

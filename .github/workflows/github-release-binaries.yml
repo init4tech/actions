@@ -1,0 +1,26 @@
+name: Release Binaries
+on:
+  workflow_call:
+    inputs:
+      binary-name:
+        description: 'name of rust binary to attach to release'
+        required: true
+        type: string
+
+permissions:
+    contents: write    
+
+jobs:
+    release_crates:
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v4
+        - name: Install Rust toolchain
+          uses: dtolnay/rust-toolchain@stable
+        - uses: Swatinem/rust-cache@v2  
+        - name: Cargo Build Release
+          run: cargo build --release
+        - name: Create Release
+          run: |
+            gh release upload "${GITHUB_REF_NAME}" target/release/${{ github.event.inputs.binary-name }}*
+                

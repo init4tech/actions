@@ -1,0 +1,78 @@
+# Publishes the Docker image.
+
+name: Docker ECR Build and Push
+
+on:
+  workflow_call:
+    inputs:
+      aws-ecr-repository:
+        description: 'ECR repository to push to'
+        required: true
+        type: string
+      aws-eks-cluster:
+        description: 'EKS cluster to deploy to'
+        required: true
+        type: string
+      aws-ecr-deployer-role-arn:
+        description: 'Role ARN to assume for ECR'
+        required: true
+        type: string
+      rust-binary-name:
+        description: 'Name of the binary to build'
+        required: true
+        type: string
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: string  
+  push:
+    branches:
+      - main
+env:
+  CARGO_TERM_COLOR: always
+  ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY }}
+
+jobs:
+  build:
+    name: build and push
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: 
+          target: aarch64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+      - name: Install binstall
+        run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+      - name: Install cross
+        run: cargo binstall cross -y --force
+      - name: Build for arm64
+        run: cross build --release --target aarch64-unknown-linux-gnu --bin ${{ inputs.rust-binary-name }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.aws-ecr-deployer-role-arn }}
+          aws-region: us-east-2
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: ${{ inputs.aws-ecr-repository }}/${{ inputs.rust-binary-name }}:latest
+          platforms: linux/arm64 
+          context: .
+      - name: Kill the existing pod
+        run: |
+          aws eks --region us-east-2 update-kubeconfig --name ${{ inputs.aws-eks-cluster }}
+          kubectl delete pod -l app=${{ inputs.rust-binary-name }}

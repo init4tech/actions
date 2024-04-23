@@ -1,0 +1,18 @@
+name: add binaries to release
+on:
+  push:
+    tags:
+    - 'v*'
+    # this will trigger anytime a tag is pushed matching the regex v* (v1.0.0, v2.0.0, etc.)
+
+permissions:
+  contents: write
+
+# this job will compile your rust project and publish the to crates.io
+# the job will run the following steps:
+#   - cargo build --release
+#   - cargo package
+#   - cargo publish
+jobs:
+  upload-binaries:
+    uses: init4tech/actions/.github/workflows/release-crates.yml@main
