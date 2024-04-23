@@ -47,7 +47,7 @@ jobs:
             - name: Build
               run: hugo --minify --destination dist --source ${{inputs.hugo-src-dir}} --theme ${{ inputs.hugo-theme }}
             - name: Archive build directory
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                 name: dist
                 path: ${{ inputs.hugo-src-dir }}/dist
