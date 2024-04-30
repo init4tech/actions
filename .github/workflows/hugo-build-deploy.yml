@@ -73,4 +73,4 @@ jobs:
               env: 
                 AWS_S3_BUCKET : ${{ inputs.aws-s3-bucket }}
               run: |
-                aws s3 sync --delete --sse AES256 /home/runner/work/.github/.github $AWS_S3_BUCKET
+                aws s3 sync --delete --sse AES256 $GITHUB_WORKSPACE $AWS_S3_BUCKET
