@@ -71,6 +71,6 @@ jobs:
                 aws-region: ${{ inputs.aws-region }}
             - name: Deploy Site to S3
               env: 
-                AWS_S3_BUCKET : ${{ secrets.AWS_S3_BUCKET }}
+                AWS_S3_BUCKET : ${{ inputs.aws-s3-bucket }}
               run: |
                 aws s3 sync --delete --sse AES256 /home/runner/work/.github/.github $AWS_S3_BUCKET
