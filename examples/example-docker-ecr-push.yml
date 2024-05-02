@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+
+permissions:
+  packages: write
+  contents: read
+  id-token: write
+
 # simplest example of using the rust-base action
 jobs:
   docker-ecr-push:
