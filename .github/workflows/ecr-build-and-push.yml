@@ -5,18 +5,6 @@ name: Docker ECR Build and Push
 on:
   workflow_call:
     inputs:
-      aws-ecr-repository:
-        description: 'ECR repository to push to'
-        required: true
-        type: string
-      aws-eks-cluster:
-        description: 'EKS cluster to deploy to'
-        required: true
-        type: string
-      aws-ecr-deployer-role-arn:
-        description: 'Role ARN to assume for ECR'
-        required: true
-        type: string
       rust-binary-name:
         description: 'Name of the binary to build'
         required: true
@@ -25,6 +13,16 @@ on:
         description: 'Environment to deploy to'
         required: true
         type: string  
+    secrets: 
+      aws-ecr-repository:
+        description: 'ECR repository to push to'
+        required: true
+      aws-eks-cluster:
+        description: 'EKS cluster to deploy to'
+        required: true
+      aws-ecr-deployer-role-arn:
+        description: 'Role ARN to assume for ECR'
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -54,7 +52,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ inputs.aws-ecr-deployer-role-arn }}
+          role-to-assume: ${{ secrets.aws-ecr-deployer-role-arn }}
           aws-region: us-east-2
       - name: Login to Amazon ECR
         id: login-ecr
@@ -67,10 +65,10 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: ${{ inputs.aws-ecr-repository }}/${{ inputs.rust-binary-name }}:latest
+          tags: ${{ secrets.aws-ecr-repository }}/${{ inputs.rust-binary-name }}:latest
           platforms: linux/arm64 
           context: .
       - name: Kill the existing pod
         run: |
-          aws eks --region us-east-2 update-kubeconfig --name ${{ inputs.aws-eks-cluster }}
+          aws eks --region us-east-1 update-kubeconfig --name ${{ secrets.aws-eks-cluster }}
           kubectl delete pod -l app=${{ inputs.rust-binary-name }}
