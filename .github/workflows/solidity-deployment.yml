@@ -31,7 +31,7 @@ on:
         required: true
      
 permissions:
-  contents: write
+  contents: read
   id-token: write
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.aws-deployer-role }}
+          role-to-assume: ${{ github.event.secrets.aws-deployer-role }}
           aws-region: us-east-1
       - name: Deploy Smart Contract
         env:
