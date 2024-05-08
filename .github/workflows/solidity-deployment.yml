@@ -1,0 +1,57 @@
+name: Solidity Deployment
+
+on:
+  workflow_call:
+    inputs:
+      network:
+        description: 'The evm network to deploy to'
+        required: true
+        type: string
+        default: 'holesky'
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: string
+    secrets:
+      aws-deployer-role:
+        description: 'Role ARN to assume for AWS'
+        required: true
+      holesky-kms-key-id:
+        description: 'KMS key ID for AWS'
+        required: true
+      holesky-rpc-url:
+        description: 'RPC URL for the network'
+        required: true
+      etherscan-api-key:
+        description: 'Etherscan API key'
+        required: true
+      
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.aws-deployer-role }}
+          aws-region: us-east-1
+      - name: Deploy Smart Contract
+        env:
+          AWS_KMS_KEY_ID: ${{ secrets.holesky-kms-key-id }}
+        run: | 
+          forge script DeployZenith \
+            --sig "run()" \
+            --rpc-url ${{ secrets.holesky-rpc-url }} \
+            --etherscan-api-key ${{ secrets.etherscan-api-key }} \
+            --aws \
+            --broadcast \
+            --verify
+          
+          

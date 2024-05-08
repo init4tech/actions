@@ -1,0 +1,51 @@
+# github-release-binaries.yml
+
+## Base Usage
+
+```yml
+release-binaries:
+  uses: init4tech/actions/.github/workflows/auto-release.yml@main
+```
+
+## Required Parameters
+
+### `network`
+
+**Description:** Which network to deploy to
+
+**Type**: `choice`
+
+**Choices**:
+- `holesky`
+
+### `environment`
+
+**Description:** The Github Environment to deploy to
+
+**Type**: `string`
+
+## Required Secrets
+
+### `aws-deployer-role`
+
+**Description:** The AWS role to assume for deployment
+
+**Type**: `string`
+
+### `holesky-kms-key-id`
+
+**Description:** The KMS key ID for the deployer key
+
+**Type**: `string`
+
+### `holesky-rpc-url`
+
+**Description:** The RPC URL for the deployment, corresponds to `network`
+
+**Type**: `string`
+
+### `etherscan-api-key`
+
+**Description:** The Etherscan API key for verifying the contract
+
+**Type**: `string`

@@ -1,0 +1,53 @@
+name: Release and Deploy Contract
+# This workflow will create a new tag and release, then deploy the contract to the specified network and environment
+
+on:
+  push:
+    branches:
+    - main
+  workflow_dispatch:
+    inputs: # these inputs are here to allow for manual triggering of releases with custom tags
+      generate-tag:
+        description: 'Generate a new tag'
+        required: true
+        default: 'true'
+      custom-tag:
+        description: 'Custom tag to be used if generate-tag is false'
+        required: false
+        default: ''
+      network:
+        description: 'Network to deploy contract to'
+        required: true
+        default: 'holesky'
+        type: choice
+        options:
+        - holesky
+      environment:
+        description: 'Environment to deploy contract to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+
+permissions: # these permissions are required for the actions to run
+  packages: write
+  contents: write
+
+jobs:
+  auto-release: # this job will create a new tag and release
+    uses: init4tech/actions/.github/workflows/auto-release.yml@main
+    with:
+      generate-tag: true
+      custom-tag: ${{ github.event.inputs.custom-tag }}
+  deploy-contract: # this job will deploy the contract
+    uses: init4tech/actions/.github/workflows/deploy-contract.yml@main
+    needs: auto-release
+    with:
+      network: ${{ github.event.inputs.network }}
+      environment: ${{ github.event.inputs.environment }}
+    secrets:
+      aws-deployer-role: ${{ secrets.AWS_DEPLOYER_ROLE }}
+      holesky-kms-key-id: ${{ secrets.HOLESKY_DEPLOYER_KEY_ID }}
+      holesky-rpc-url: ${{ secrets.HOLESKY_RPC_URL }}
+      etherscan-api-key: ${{ secrets.ETHERSCAN_API_KEY }}
