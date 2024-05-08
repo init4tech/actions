@@ -12,6 +12,10 @@ on:
         description: 'Environment to deploy to'
         required: true
         type: string
+      forge-deployment-script:
+        description: 'Name of the forge deployment script'
+        required: true
+        type: string
     secrets:
       aws-deployer-role:
         description: 'Role ARN to assume for AWS'
@@ -46,7 +50,7 @@ jobs:
         env:
           AWS_KMS_KEY_ID: ${{ secrets.holesky-kms-key-id }}
         run: | 
-          forge script DeployZenith \
+          forge script ${{ inputs.forge-deployment-script }} \
             --sig "run()" \
             --rpc-url ${{ secrets.holesky-rpc-url }} \
             --etherscan-api-key ${{ secrets.etherscan-api-key }} \

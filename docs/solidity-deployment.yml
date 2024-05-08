@@ -24,6 +24,12 @@ release-binaries:
 
 **Type**: `string`
 
+### `forge-deployment-script`
+
+**Description:** The name of the forge deployment script to be used
+
+**Type**: `string`
+
 ## Required Secrets
 
 ### `aws-deployer-role`
