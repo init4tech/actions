@@ -29,7 +29,11 @@ on:
       etherscan-api-key:
         description: 'Etherscan API key'
         required: true
-      
+     
+permissions:
+  contents: write
+  id-token: write
+
 jobs:
   deploy:
     name: Deploy
