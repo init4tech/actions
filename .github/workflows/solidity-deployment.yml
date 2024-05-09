@@ -16,6 +16,14 @@ on:
         description: 'Name of the forge deployment script'
         required: true
         type: string
+      deployed-contract:
+        description: 'Name of the deployed contract'
+        required: true
+        type: string
+      chain-id: 
+        description: 'Chain ID of the network'
+        required: true
+        type: string
     secrets:
       aws-deployer-role:
         description: 'Role ARN to assume for AWS'
@@ -61,5 +69,8 @@ jobs:
             --aws \
             --broadcast \
             --verify
-          
-          
+      - name: Upload Transaction Json
+        uses: actions/upload-artifact@v4
+        with:
+          name: transaction-json
+          path: broadcast/${{ inputs.deployed-contract }}/${{ inputs.chain-id }}/run-latest.json
