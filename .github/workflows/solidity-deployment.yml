@@ -12,7 +12,7 @@ on:
         description: 'Environment to deploy to'
         required: true
         type: string
-      forge-deployment-script:
+      forge-deployment-contract:
         description: 'Name of the forge deployment script'
         required: true
         type: string
@@ -21,7 +21,7 @@ on:
         required: true
         type: string
         default: 'run()'
-      deployed-contract:
+      forge-deployment-script-file:
         description: 'Name of the deployed contract'
         required: true
         type: string
@@ -67,7 +67,7 @@ jobs:
         env:
           AWS_KMS_KEY_ID: ${{ secrets.holesky-kms-key-id }}
         run: | 
-          forge script ${{ inputs.forge-deployment-script }} \
+          forge script ${{ inputs.forge-deployment-contract }} \
             --sig "${{inputs.forge-deployment-signature}}" \
             --rpc-url ${{ secrets.holesky-rpc-url }} \
             --etherscan-api-key ${{ secrets.etherscan-api-key }} \
