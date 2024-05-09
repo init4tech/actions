@@ -80,6 +80,8 @@ jobs:
           name: transaction-json
           path: broadcast/${{ inputs.deployed-contract }}/${{ inputs.chain-id }}/run-latest.json
       - name: Update Release Notes
+        env: 
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           CONTRACT_ADDRESS=$(cat broadcast/${{ inputs.deployed-contract }}/${{ inputs.chain-id }}/run-latest.json | jq '.transactions[0].contractAddress')
           LATEST_TAG=$(gh api repos/:owner/:repo/releases/latest --jq '.tag_name')
