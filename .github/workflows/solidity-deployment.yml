@@ -16,6 +16,11 @@ on:
         description: 'Name of the forge deployment script'
         required: true
         type: string
+      forge-deployment-signature:
+        description: 'Signature of the function to call'
+        required: true
+        type: string
+        default: 'run()'
       deployed-contract:
         description: 'Name of the deployed contract'
         required: true
@@ -63,7 +68,7 @@ jobs:
           AWS_KMS_KEY_ID: ${{ secrets.holesky-kms-key-id }}
         run: | 
           forge script ${{ inputs.forge-deployment-script }} \
-            --sig "run()" \
+            --sig "${{inputs.forge-deployment-signature}}" \
             --rpc-url ${{ secrets.holesky-rpc-url }} \
             --etherscan-api-key ${{ secrets.etherscan-api-key }} \
             --aws \
@@ -74,3 +79,12 @@ jobs:
         with:
           name: transaction-json
           path: broadcast/${{ inputs.deployed-contract }}/${{ inputs.chain-id }}/run-latest.json
+      - name: Update Release Notes
+        run: |
+          CONTRACT_ADDRESS=$(cat broadcast/${{ inputs.deployed-contract }}/${{ inputs.chain-id }}/run-latest.json | jq '.transactions[0].contractAddress')
+          LATEST_TAG=$(gh api repos/:owner/:repo/releases/latest --jq '.tag_name')
+          gh release edit $LATEST_TAG --notes-file - <<EOF
+          # Deployment Information:
+          ### **${{ inputs.deployed-contract }}**: \`${CONTRACT_ADDRESS}\`" 
+          [Block Explorer](https://holesky.etherscan.io/address/${CONTRACT_ADDRESS}#code)
+          EOF
