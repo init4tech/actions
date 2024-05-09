@@ -13,16 +13,16 @@ on:
         required: true
         type: string
       forge-deployment-contract:
-        description: 'Name of the forge deployment script'
+        description: 'Name of the deployment contract'
         required: true
         type: string
       forge-deployment-signature:
-        description: 'Signature of the function to call'
+        description: 'Signature of the deployment function to call'
         required: true
         type: string
         default: 'run()'
       forge-deployment-script-file:
-        description: 'Name of the deployed contract'
+        description: 'Name of the deployment script file'
         required: true
         type: string
       chain-id: 
