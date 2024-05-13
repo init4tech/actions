@@ -75,7 +75,8 @@ jobs:
             --broadcast \
             --verify \
             --retries 20 \
-            --delay 5
+            --chain holesky \
+            --delay 5 \
       - name: Upload Transaction Json
         uses: actions/upload-artifact@v4
         with:
