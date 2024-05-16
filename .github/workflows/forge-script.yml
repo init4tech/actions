@@ -1,0 +1,58 @@
+name: Solidity Deployment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: string
+      forge-script-contract:
+        description: 'Name of the script contract'
+        required: true
+        type: string
+      forge-script-signature:
+        description: 'Signature of the script function to call'
+        required: true
+        type: string
+    secrets:
+      aws-role:
+        description: 'Role ARN to assume for AWS'
+        required: true
+      kms-key-id:
+        description: 'KMS key ID for AWS'
+        required: true
+      rpc-url:
+        description: 'RPC URL for the network'
+        required: true
+     
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  run-script:
+    name: Run Forge Script
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.aws-role }}
+          aws-region: us-east-1
+      - name: Run Script ${{inputs.forge-script-signature}}
+        env:
+          AWS_KMS_KEY_ID: ${{ secrets.kms-key-id }}
+        run: | 
+          forge script ${{ inputs.forge-script-contract }} \
+            --sig "${{inputs.forge-script-signature}}" \
+            --rpc-url ${{ secrets.rpc-url }} \
+            --aws \
+            --broadcast \
+            // TODO: parameters
