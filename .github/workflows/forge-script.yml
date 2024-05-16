@@ -3,8 +3,8 @@ name: Forge Script
 on:
   workflow_call:
     inputs:
-      environment:
-        description: 'Environment to deploy to'
+      github-environment:
+        description: 'Github Environment to deploy from; contains required secrets'
         required: true
         type: string
       forge-script-contract:
@@ -34,7 +34,7 @@ jobs:
   run-script:
     name: Run Forge Script
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.github-environment }}
     steps:
       - uses: actions/checkout@v4
         with:
