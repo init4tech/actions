@@ -8,35 +8,36 @@ on:
         required: true
         type: string
         default: 'holesky'
+      chain-id: 
+          description: 'Chain ID of the network'
+          required: true
+          type: string
+          default: '17000'  
       etherscan-url:
           description: 'The base URL for etherscan for the network'
           required: true
           type: string
           default: 'https://holesky.etherscan.io'
       environment:
-        description: 'Environment to deploy to'
+        description: 'Github Environment to deploy from; contains required secrets'
         required: true
         type: string
       forge-deployment-contract:
-        description: 'Name of the deployment contract'
+        description: 'Name of the contract containing the deploy script'
         required: true
         type: string
       forge-deployment-signature:
-        description: 'Signature of the deployment function to call'
+        description: 'Signature of the deploy script function to call'
         required: true
         type: string
         default: 'run()'
       forge-deployment-script-file:
-        description: 'Name of the deployment script file'
-        required: true
-        type: string
-      chain-id: 
-        description: 'Chain ID of the network'
+        description: 'Name of the file containing the deploy script'
         required: true
         type: string
     secrets:
       aws-deployer-role:
-        description: 'Role ARN to assume for AWS'
+        description: 'AWS Role to assume'
         required: true
       kms-key-id:
         description: 'KMS key ID for AWS'
