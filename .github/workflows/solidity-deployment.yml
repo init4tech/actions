@@ -8,6 +8,11 @@ on:
         required: true
         type: string
         default: 'holesky'
+      etherscan-url:
+          description: 'The base URL for etherscan for the network'
+          required: true
+          type: string
+          default: 'https://holesky.etherscan.io'
       environment:
         description: 'Environment to deploy to'
         required: true
@@ -33,10 +38,10 @@ on:
       aws-deployer-role:
         description: 'Role ARN to assume for AWS'
         required: true
-      holesky-kms-key-id:
+      kms-key-id:
         description: 'KMS key ID for AWS'
         required: true
-      holesky-rpc-url:
+      rpc-url:
         description: 'RPC URL for the network'
         required: true
       etherscan-api-key:
@@ -65,17 +70,17 @@ jobs:
           aws-region: us-east-1
       - name: Deploy Smart Contract
         env:
-          AWS_KMS_KEY_ID: ${{ secrets.holesky-kms-key-id }}
+          AWS_KMS_KEY_ID: ${{ secrets.kms-key-id }}
         run: | 
           forge script ${{ inputs.forge-deployment-contract }} \
             --sig "${{inputs.forge-deployment-signature}}" \
-            --rpc-url ${{ secrets.holesky-rpc-url }} \
+            --rpc-url ${{ secrets.rpc-url }} \
             --etherscan-api-key ${{ secrets.etherscan-api-key }} \
             --aws \
             --broadcast \
             --verify \
             --retries 20 \
-            --chain holesky \
+            --chain ${{ inputs.network }} \
             --delay 5 \
       - name: Upload Transaction Json
         uses: actions/upload-artifact@v4
@@ -91,5 +96,5 @@ jobs:
           gh release edit $LATEST_TAG --notes-file - <<EOF
           # Deployment Information:
           ### **${{ inputs.network }}**: \`${CONTRACT_ADDRESS}\`" 
-          [Block Explorer](https://holesky.etherscan.io/address/${CONTRACT_ADDRESS}#code)
+          [Block Explorer](${{inputs.etherscan-url}}/address/${CONTRACT_ADDRESS}#code)
           EOF
