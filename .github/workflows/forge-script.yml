@@ -1,4 +1,4 @@
-name: Solidity Deployment
+name: Forge Script
 
 on:
   workflow_call:
