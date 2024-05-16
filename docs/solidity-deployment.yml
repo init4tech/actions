@@ -11,47 +11,78 @@ release-binaries:
 
 ### `network`
 
-**Description:** Which network to deploy to
+**Description:** The evm network to deploy to
 
 **Type**: `choice`
 
 **Choices**:
 - `holesky`
 
+### `chain-id`
+
+**Description:** Chain ID for the network
+
+**Type**: `choice`
+
+**Choices**:
+- `17000`
+
+### `etherscan-url`
+
+**Description:** The base URL for etherscan for the network
+
+**Type**: `choice`
+
+**Choices**:
+- `https://holesky.etherscan.io`
+
+
 ### `environment`
 
-**Description:** The Github Environment to deploy to
+**Description:** Github Environment to deploy from; contains required secrets
 
 **Type**: `string`
 
-### `forge-deployment-script`
+### `forge-deployment-contract`
 
-**Description:** The name of the forge deployment script to be used
+**Description:** Name of the contract containing the deploy script
+
+**Type**: `string`
+
+### `forge-deployment-signature`
+
+**Description:** Signature of the deploy script function to call
+
+**Type**: `string`
+
+### `forge-deployment-script-file`
+
+**Description:** Name of the file containing the deploy script
 
 **Type**: `string`
 
 ## Required Secrets
 
-### `aws-deployer-role`
+### `aws-role`
 
-**Description:** The AWS role to assume for deployment
-
-**Type**: `string`
-
-### `holesky-kms-key-id`
-
-**Description:** The KMS key ID for the deployer key
+**Description:** AWS Role to assume
 
 **Type**: `string`
 
-### `holesky-rpc-url`
+### `kms-key-id`
 
-**Description:** The RPC URL for the deployment, corresponds to `network`
+**Description:** KMS key ID for AWS
+
+**Type**: `string`
+
+### `rpc-url`
+
+**Description:** RPC URL for the network
 
 **Type**: `string`
 
 ### `etherscan-api-key`
 
-**Description:** The Etherscan API key for verifying the contract
+**Description:** Etherscan API key; used for verifying the contract
 
 **Type**: `string`
