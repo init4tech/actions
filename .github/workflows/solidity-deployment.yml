@@ -87,7 +87,7 @@ jobs:
             --retries 20 \
             --chain ${{ inputs.network }} \
             --delay 5 \
-            "${{ inputs.forge-deployment-params }}"
+            ${{ inputs.forge-deployment-params }}
       - name: Upload Transaction Json
         uses: actions/upload-artifact@v4
         with:
