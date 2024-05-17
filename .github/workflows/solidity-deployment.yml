@@ -39,10 +39,6 @@ on:
         description: 'Parameters for the deployment script'
         required: false
         type: string
-      chain-id: 
-        description: 'Chain ID of the network'
-        required: true
-        type: string
     secrets:
       aws-deployer-role:
         description: 'AWS Role to assume'
