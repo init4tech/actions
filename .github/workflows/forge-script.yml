@@ -15,6 +15,10 @@ on:
         description: 'Signature of the script function to call'
         required: true
         type: string
+      forge-script-params:
+        description: 'Parameters for the script'
+        required: false
+        type: string
     secrets:
       aws-role:
         description: 'Role ARN to assume for AWS'
@@ -55,4 +59,4 @@ jobs:
             --rpc-url ${{ secrets.rpc-url }} \
             --aws \
             --broadcast \
-            // TODO: parameters
+            ${{ inputs.forge-script-params }}

@@ -32,7 +32,15 @@ on:
         type: string
         default: 'run()'
       forge-deployment-script-file:
-        description: 'Name of the file containing the deploy script'
+        description: 'Name of the deployment script file'
+        required: true
+        type: string
+      forge-deployment-params:
+        description: 'Parameters for the deployment script'
+        required: false
+        type: string
+      chain-id: 
+        description: 'Chain ID of the network'
         required: true
         type: string
     secrets:
@@ -83,6 +91,7 @@ jobs:
             --retries 20 \
             --chain ${{ inputs.network }} \
             --delay 5 \
+            "${{ inputs.forge-deployment-params }}"
       - name: Upload Transaction Json
         uses: actions/upload-artifact@v4
         with:
