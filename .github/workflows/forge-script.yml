@@ -29,6 +29,9 @@ on:
       rpc-url:
         description: 'RPC URL for the network'
         required: true
+
+permissions:
+  id-token: write
      
 jobs:
   run-script:
