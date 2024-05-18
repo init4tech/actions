@@ -57,5 +57,6 @@ jobs:
             --sig "${{inputs.forge-script-signature}}" \
             --rpc-url ${{ secrets.rpc-url }} \
             --aws \
+            --legacy \
             --broadcast \
             ${{ inputs.forge-script-params }}
