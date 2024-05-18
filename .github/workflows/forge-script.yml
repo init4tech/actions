@@ -30,10 +30,6 @@ on:
         description: 'RPC URL for the network'
         required: true
      
-permissions:
-  contents: write
-  id-token: write
-
 jobs:
   run-script:
     name: Run Forge Script
