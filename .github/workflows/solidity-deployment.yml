@@ -83,6 +83,7 @@ jobs:
             --etherscan-api-key ${{ secrets.etherscan-api-key }} \
             --aws \
             --broadcast \
+            --legacy \
             --verify \
             --retries 20 \
             --chain ${{ inputs.network }} \
