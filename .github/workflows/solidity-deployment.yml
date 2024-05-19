@@ -98,7 +98,8 @@ jobs:
         env: 
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CONTRACT_ADDRESS=$(cat broadcast/${{ inputs.forge-deployment-script-file }}/${{ inputs.chain-id }}/run-latest.json | jq '.transactions[0].contractAddress')
+          SIG_NAME=$(echo ${{ inputs.forge-deployment-signature }} | cut -d '(' -f 1)
+          CONTRACT_ADDRESS=$(cat broadcast/${{ inputs.forge-deployment-script-file }}/${{ inputs.chain-id }}/${SIG_NAME}-latest.json | jq '.transactions[0].contractAddress')
           LATEST_TAG=$(gh api repos/:owner/:repo/releases/latest --jq '.tag_name')
           gh release edit $LATEST_TAG --notes-file - <<EOF
           # Deployment Information:
