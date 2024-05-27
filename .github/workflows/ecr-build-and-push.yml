@@ -31,7 +31,8 @@ env:
 jobs:
   build:
     name: build and push
-    runs-on: ubuntu-latest
+    runs-on: 
+      group: init4-runners
     environment: ${{ inputs.environment }}
     permissions:
       packages: write
@@ -41,7 +42,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with: 
-          target: aarch64-unknown-linux-gnu
+          target: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
       - name: Cache Docker layers
         uses: actions/cache@v4
@@ -58,8 +59,6 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and push
@@ -67,7 +66,7 @@ jobs:
         with:
           push: true
           tags: ${{ secrets.aws-ecr-repository }}/${{ inputs.rust-binary-name }}:latest
-          platforms: linux/arm64 
+          platforms: linux/x86_64 
           context: .
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
