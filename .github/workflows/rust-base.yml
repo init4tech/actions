@@ -34,6 +34,8 @@ jobs:
         with:
           version: nightly
       - name: Run tests
+        env: 
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: |
           cargo test --all-features --workspace
 
@@ -49,6 +51,8 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
       - name: Check formatting
+        env: 
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo fmt --all --check
 
   clippy:
@@ -63,6 +67,8 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       - name: Clippy check
+        env: 
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
 
   docs:
@@ -77,4 +83,5 @@ jobs:
       - name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo doc --no-deps --document-private-items --all-features --workspace --examples
