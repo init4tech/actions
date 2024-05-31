@@ -53,7 +53,7 @@ jobs:
       - name: Check formatting
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo fmt --all --check --locked
+        run: cargo fmt --all --check
 
   clippy:
     name: Clippy
