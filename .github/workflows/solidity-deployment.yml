@@ -13,6 +13,10 @@ on:
           required: true
           type: string
           default: '17000'  
+      deployer-address:
+          description: 'Address of the deployer'
+          required: true
+          type: string
       etherscan-url:
           description: 'The base URL for etherscan for the network'
           required: true
@@ -87,6 +91,7 @@ jobs:
             --verify \
             --retries 20 \
             --chain ${{ inputs.network }} \
+            --sender ${{ inputs.deployer-address}}
             --delay 5 \
             ${{ inputs.forge-deployment-params }}
       - name: Upload Transaction Json
