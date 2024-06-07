@@ -12,6 +12,11 @@ on:
         required: false
         default: false
         type: boolean
+      require-lockfile:
+        description: 'Require a Cargo.lock file to be present'
+        required: false
+        default: false
+        type: boolean
       os:
         description: 'sets the OS'
         required: false
@@ -33,11 +38,18 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-      - name: Run tests
+      - if: ${{ inputs.require-lockfile == true }}
+        name: Run tests
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: |
           cargo test --all-features --workspace --locked
+      - if: ${{ inputs.require-lockfile == false }}
+        name: Run tests
+        env: 
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: |
+          cargo test --all-features --workspace
 
   rustfmt:
     name: Rustfmt
@@ -66,10 +78,16 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Clippy check
+      - if: ${{ inputs.require-lockfile == true }}
+        name: Clippy check
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo clippy --all-targets --all-features --workspace --locked -- -D warnings
+      - if: ${{ inputs.require-lockfile == false }}
+        name: Clippy check
+        env: 
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo clippy --all-targets --all-features --workspace -- -D warnings
 
   docs:
     name: Docs
@@ -80,8 +98,15 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      - name: Check documentation
+      - if: ${{ inputs.require-lockfile == true }}
+        name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --locked
+      - if: ${{ inputs.require-lockfile == false }}
+        name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples

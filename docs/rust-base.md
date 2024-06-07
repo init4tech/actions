@@ -28,3 +28,13 @@ rust-base:
 **Default Value:** `false`
 
 **Allowed values:** `false`,`true`
+
+### `require-lockfile`
+
+**Description:** Will require a `Cargo.lock` file to be present in the repository
+
+**Type**: `boolean`
+
+**Default Value:** `false`
+
+**Allowed values:** `false`,`true`
