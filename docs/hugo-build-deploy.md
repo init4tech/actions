@@ -5,6 +5,13 @@
 ```yml
 rust-base:
   uses: init4tech/actions/.github/workflows/hugo-build-deploy.yml@main
+  with:
+    hugo-src-dir: 'src'
+    hugo-theme: 'hugo-theme'
+    environment: 'production'
+    aws-iam-deployer-role: 'arn:aws:iam::123456789012:role/deployer-role'
+    aws-s3-bucket: 'my-bucket'
+    aws-region: 'us-east-1'
 ```
 
 ## Required Parameters

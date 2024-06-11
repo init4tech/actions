@@ -3,8 +3,8 @@
 ## Base Usage
 
 ```yml
-release-binaries:
+release-docker-ghcr:
   uses: init4tech/actions/.github/workflows/release-rust-bin.yml@main
 ```
 
-## Required Parameters
+## Optional Parameters

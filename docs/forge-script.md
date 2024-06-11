@@ -3,8 +3,13 @@
 ## Base Usage
 
 ```yml
-create-release:
+forge-script:
   uses: init4tech/actions/.github/workflows/auto-release.yml@main
+  with:
+    github-environment: 'dev'
+    forge-script-contract: '0x0000000000000000000000000000000000000000'
+    forge-script-signature: 'myFunction(address,uint256)'
+    forge-script-params: '0x0000000000000000000000000000000000000000 123'
 ```
 
 ## Required Parameters

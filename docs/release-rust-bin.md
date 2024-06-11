@@ -3,8 +3,10 @@
 ## Base Usage
 
 ```yml
-release-binaries:
+release-rust-bin:
   uses: init4tech/actions/.github/workflows/release-rust-bin.yml@main
+  with:
+    binary-name: 'my-binary'
 ```
 
 ## Required Parameters
