@@ -1,0 +1,11 @@
+name: Push Docker to GHCR
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+# simplest example of using the rust-base action
+jobs:
+  release-docker:
+    uses: init4tech/actions/.github/workflows/release-docker-ghcr.yml@main
