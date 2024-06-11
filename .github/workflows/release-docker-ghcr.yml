@@ -4,6 +4,7 @@ on:
 
 permissions:
     contents: write    
+    packages: write
 
 env: 
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
