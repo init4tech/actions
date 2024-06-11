@@ -5,6 +5,8 @@
 ```yml
 create-release:
   uses: init4tech/actions/.github/workflows/auto-release.yml@main
+  with:
+    generate-tag: true
 ```
 
 ## Required Parameters

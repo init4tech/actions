@@ -3,7 +3,7 @@
 ## Base Usage
 
 ```yml
-release-binaries:
+release-crates:
   uses: init4tech/actions/.github/workflows/release-crates.yml@main
 ```
 
