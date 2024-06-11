@@ -1,0 +1,48 @@
+on:
+  workflow_call:
+    inputs:
+      binary-name:
+        description: 'Name of the binary to release'
+        required: true
+        type: string
+      tag:
+        description: 'Tag to use for the release'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            os: linux
+            arch: x86_64
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            os: linux
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    - uses: Swatinem/rust-cache@v2  
+    - name: Cargo Build Release
+      run: cargo build --release --target ${{ matrix.target }}
+    - name: Tarball Binaries
+      run: |
+        mkdir -p ${{ inputs.binary-name }}
+        cp target/${{ matrix.target }}/release/${{ inputs.binary-name }} ${{ inputs.binary-name }}/
+        tar -czf release-${{ matrix.os}}-${{ matrix.arch }}.tar.gz ${{ inputs.binary-name }}/
+    - name: Upload Release
+      run: |
+        gh release upload ${{ inputs.tag }} release-${{ matrix.os}}-${{ matrix.arch }}.tar.gz
