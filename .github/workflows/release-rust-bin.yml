@@ -5,6 +5,10 @@ on:
         description: 'Name of the binary to release'
         required: true
         type: string
+      tag:
+        description: 'Tag to use for the release'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -39,4 +43,4 @@ jobs:
         tar -czf release-${{ matrix.os}}-${{ matrix.arch }}.tar.gz ${{ inputs.binary-name }}/
     - name: Upload Release
       run: |
-        gh release upload ${{ github.ref }} release-${{ matrix.os}}-${{ matrix.arch }}.tar.gz
+        gh release upload ${{ inputs.tag }} release-${{ matrix.os}}-${{ matrix.arch }}.tar.gz

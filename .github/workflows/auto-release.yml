@@ -31,6 +31,7 @@ jobs:
         LATEST_TAG=$(gh api repos/:owner/:repo/releases/latest --jq '.tag_name')
         VERSION_NEXT="$(echo "$LATEST_TAG" | awk -F. '{$NF++; print $1"."$2"."$NF}')"
         echo "VERSION_NEXT=$VERSION_NEXT" >> $GITHUB_ENV
+        echo "GENERATED_TAG=$VERSION_NEXT" >> $GITHUB_OUTPUT
     - name: Use Custom Tag
       if: ${{ !inputs.generate-tag }}
       run: |

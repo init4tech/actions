@@ -1,0 +1,35 @@
+name: Release and Deploy Contract
+# This workflow will create a new tag and release and upload the binary named 'my-binary' to the release on every push to main
+
+on:
+  push:
+    branches:
+    - main
+  workflow_dispatch:
+    inputs: # these inputs are here to allow for manual triggering of releases with custom tags
+      generate-tag:
+        description: 'Generate a new tag'
+        required: true
+        default: 'true'
+      custom-tag:
+        description: 'Custom tag to be used if generate-tag is false'
+        required: false
+        default: ''
+
+permissions: # these permissions are required for the actions to run
+  packages: write
+  contents: write
+
+jobs:
+  auto-release: # this job will create a new tag and release
+    uses: init4tech/actions/.github/workflows/auto-release.yml@main
+    with:
+      generate-tag: true
+      custom-tag: ${{ github.event.inputs.custom-tag }}
+  release-bin:
+    uses: init4tech/actions/.github/workflows/release-rust-bin.yml@main
+    needs: auto-release
+    with:
+      binary-name: 'my-binary'
+      tag: ${{ needs.auto-release.outputs.GENERATED_TAG }}
+

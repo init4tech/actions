@@ -3,7 +3,7 @@
 ## Base Usage
 
 ```yml
-release-binaries:
+create-release:
   uses: init4tech/actions/.github/workflows/auto-release.yml@main
 ```
 
@@ -22,3 +22,9 @@ release-binaries:
 **Description:** If `generate-tag` is set to `false` then the specified tag will be used to create the release
 
 **Type**: `string`
+
+## Outputs
+
+### `GENERATED_TAG`
+
+**Description:** The tag that was generated for the release
