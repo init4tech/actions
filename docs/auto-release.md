@@ -27,4 +27,8 @@ create-release:
 
 ### `GENERATED_TAG`
 
+<<<<<<< HEAD
 **Description:** The tag that was generated for the release
+=======
+**Description:** The tag that was generated for the release
+>>>>>>> d40a6fd (feat(auto-release): updates to create output of the tag created by auto-release, plus docs)
