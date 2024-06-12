@@ -34,7 +34,7 @@ on:
         description: 'Signature of the deploy script function to call'
         required: true
         type: string
-        default: 'run()'
+        default: 'deploy()'
       forge-deployment-script-file:
         description: 'Name of the deployment script file'
         required: true
@@ -106,6 +106,7 @@ jobs:
           SIG_NAME=$(echo ${{ inputs.forge-deployment-signature }} | cut -d '(' -f 1)
           CONTRACT_ADDRESS=$(cat broadcast/${{ inputs.forge-deployment-script-file }}/${{ inputs.chain-id }}/${SIG_NAME}-latest.json | jq '.transactions[0].contractAddress')
           LATEST_TAG=$(gh api repos/:owner/:repo/releases/latest --jq '.tag_name')
+          echo "CONTRACT_ADDRESS=$CONTRACT_ADDRESS" >> $GITHUB_OUTPUT
           gh release edit $LATEST_TAG --notes-file - <<EOF
           # Deployment Information:
           ### **${{ inputs.network }}**: \`${CONTRACT_ADDRESS}\`" 
