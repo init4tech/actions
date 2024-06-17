@@ -107,7 +107,7 @@ jobs:
           LATEST_TAG=$(gh api repos/:owner/:repo/releases/latest --jq '.tag_name')
           gh release view $LATEST_TAG --json body -q .body >> releaseNotes.md 
           echo "# Deployment Information:" >> releaseNotes.md
-          echo "## Network: **${{ inputs.network }}**" >> releaseNotes.md
+          echo "## ${{ inputs.network }}" >> releaseNotes.md
           (cat broadcast/${{ inputs.forge-deployment-script-file }}/${{ inputs.chain-id }}/${SIG_NAME}-latest.json | jq '.transactions | .[] | select(.transactionType == "CREATE") | "- [\(.contractName)](${{inputs.etherscan-url}}/address/\(.contractAddress)#code): \(.contractAddress)"' | tr -d '"' >> releaseNotes.md)
             
           gh release edit $LATEST_TAG --notes-file releaseNotes.md
