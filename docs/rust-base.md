@@ -38,3 +38,19 @@ rust-base:
 **Default Value:** `false`
 
 **Allowed values:** `false`,`true`
+
+### `requires-private-deps`
+ 
+**Description:** Will require the use of private dependencies in the repository, meaning an ssh key needs to be added to ssh-agent
+
+**Type**: `boolean`
+
+**Default Value:** `false`
+
+**Allowed values:** `false`,`true`
+
+## Optional Secrets
+
+### `SSH_PRIVATE_KEY`
+
+**Description:** The SSH private key to be used for private dependencies, required if `requires-private-deps` is set to `true`
