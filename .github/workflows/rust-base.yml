@@ -58,13 +58,13 @@ jobs:
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: |
-          cargo test --all-features --workspace --locked
+          cargo test --all-features --workspace --locked  --profile ci-rust
       - if: ${{ inputs.require-lockfile == false }}
         name: Run tests
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: |
-          cargo test --all-features --workspace
+          cargo test --all-features --workspace  --profile ci-rust
 
   rustfmt:
     name: Rustfmt
@@ -103,12 +103,12 @@ jobs:
         name: Clippy check
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets --all-features --workspace --locked -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace --locked --profile ci-rust -- -D warnings
       - if: ${{ inputs.require-lockfile == false }}
         name: Clippy check
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets --all-features --workspace -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace  --profile ci-rust -- -D warnings
 
   docs:
     name: Docs
@@ -130,10 +130,10 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --locked
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ci-rust --locked
       - if: ${{ inputs.require-lockfile == false }}
         name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ci-rust
