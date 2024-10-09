@@ -35,7 +35,8 @@ on:
 jobs:
   test:
     name: Test Suite
-    runs-on: ${{ inputs.os }}
+    runs-on: 
+      group: init4-runners
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -83,7 +84,8 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: ubuntu-latest
+    runs-on: 
+      group: init4-runners
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -110,7 +112,8 @@ jobs:
 
   docs:
     name: Docs
-    runs-on: ubuntu-latest
+    runs-on: 
+      group: init4-runners
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
