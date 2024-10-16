@@ -27,6 +27,11 @@ on:
         required: false
         default: false
         type: boolean
+      rust-profile:
+        description: 'The profile to give to cargo for running, defaults to dev'
+        required: false
+        default: 'dev'
+        type: string
     secrets:
       SSH_PRIVATE_KEY:
         description: 'SSH private key for fetching private dependencies'
@@ -58,13 +63,13 @@ jobs:
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: |
-          cargo test --all-features --workspace --locked  --profile ci-rust
+          cargo test --all-features --workspace --locked  --profile ${{ inputs.rust-profile }}
       - if: ${{ inputs.require-lockfile == false }}
         name: Run tests
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: |
-          cargo test --all-features --workspace  --profile ci-rust
+          cargo test --all-features --workspace  --profile ${{ inputs.rust-profile }}
 
   rustfmt:
     name: Rustfmt
@@ -103,12 +108,12 @@ jobs:
         name: Clippy check
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets --all-features --workspace --locked --profile ci-rust -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace --locked --profile ${{ inputs.rust-profile }} -- -D warnings
       - if: ${{ inputs.require-lockfile == false }}
         name: Clippy check
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets --all-features --workspace  --profile ci-rust -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace  --profile ${{ inputs.rust-profile }} -- -D warnings
 
   docs:
     name: Docs
@@ -130,10 +135,10 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ci-rust --locked
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }} --locked
       - if: ${{ inputs.require-lockfile == false }}
         name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ci-rust
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }}
