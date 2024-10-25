@@ -53,6 +53,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
       - name: Optional Foundry Install
         if: ${{ inputs.install-foundry == true }}
         uses: foundry-rs/foundry-toolchain@v1
@@ -63,13 +64,13 @@ jobs:
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: |
-          cargo test --all-features --workspace --locked  --profile ${{ inputs.rust-profile }}
+          cargo nextest run --all-features --workspace --locked  --profile ${{ inputs.rust-profile }}
       - if: ${{ inputs.require-lockfile == false }}
         name: Run tests
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: |
-          cargo test --all-features --workspace  --profile ${{ inputs.rust-profile }}
+          cargo nextest run --all-features --workspace  --profile ${{ inputs.rust-profile }}
 
   rustfmt:
     name: Rustfmt
