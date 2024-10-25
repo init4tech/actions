@@ -59,4 +59,5 @@ jobs:
             --aws \
             --legacy \
             --broadcast \
+            --vvvv \
             ${{ inputs.forge-script-params }}
