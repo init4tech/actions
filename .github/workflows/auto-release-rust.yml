@@ -1,0 +1,44 @@
+name: Rust Auto-Release 
+
+on:
+  workflow_call:
+    inputs:
+      binary-name:
+        description: 'The name of the rust binary that will be used for versioning the release'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with: 
+          fetch-tags: "true"
+          fetch-depth: "0"
+      - name: Create Crate Release (if needed)
+        env:
+            GH_TOKEN: ${{ github.token }}
+        run: |
+            echo "Checking if a new release is needed"
+            # get current version from cargo
+            CARGO_VER="v$(cargo metadata --format-version=1 --no-deps  | jq ".packages[] | select(.name == \"${CARGO_BINARY_NAME}\") | .version" -r)"
+            echo "$CARGO_VER"
+            # get latest version from git tags
+            GIT_VER=$(git describe --tags $(git rev-list --tags --max-count=1))
+            echo "$GIT_VER"
+            if [ "$CARGO_VER" == "$GIT_VER" ]; then
+            echo "# No new release needed" >> $GITHUB_STEP_SUMMARY
+            exit 0
+            else
+                echo "New release needed"
+                gh release create "$CARGO_VER" -t "$CARGO_VER" --generate-notes
+                ## Add the release information to the github actions summary
+                echo "# New Release Created" >> $GITHUB_STEP_SUMMARY
+                echo "Tag: [$CARGO_VER](https://github.com/init4tech/builder/releases/tag/${CARGO_VER})" >> $GITHUB_STEP_SUMMARY
+            fi
