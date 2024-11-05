@@ -42,3 +42,5 @@ jobs:
                 echo "# New Release Created" >> $GITHUB_STEP_SUMMARY
                 echo "Tag: [$CARGO_VER](https://github.com/init4tech/builder/releases/tag/${CARGO_VER})" >> $GITHUB_STEP_SUMMARY
             fi
+            # output tag to github actions
+            echo "GENERATED_TAG=$CARGO_VER" >> $GITHUB_OUTPUT
