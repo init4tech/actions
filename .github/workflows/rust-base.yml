@@ -39,6 +39,9 @@ on:
       SSH_PRIVATE_KEY_2: 
         description: 'SSH private key for fetching private dependencies'
         required: false
+      SSH_PRIVATE_KEY_3:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
 jobs:
   test:
     name: Test Suite
@@ -52,8 +55,9 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: |
-            ${{ secrets.SSH_PRIVATE_KEY }}
+            ${{ secrets.SSH_PRIVATE_KEY }}            
             ${{ secrets.SSH_PRIVATE_KEY_2 }}
+            ${{ secrets.SSH_PRIVATE_KEY_3 }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -106,6 +110,7 @@ jobs:
           ssh-private-key: |
             ${{ secrets.SSH_PRIVATE_KEY }}            
             ${{ secrets.SSH_PRIVATE_KEY_2 }}
+            ${{ secrets.SSH_PRIVATE_KEY_3 }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -136,6 +141,7 @@ jobs:
           ssh-private-key: |
             ${{ secrets.SSH_PRIVATE_KEY }}            
             ${{ secrets.SSH_PRIVATE_KEY_2 }}
+            ${{ secrets.SSH_PRIVATE_KEY_3 }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
