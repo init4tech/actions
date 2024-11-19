@@ -17,9 +17,6 @@ on:
       aws-ecr-repository:
         description: 'ECR repository to push to'
         required: true
-      aws-eks-cluster:
-        description: 'EKS cluster to deploy to'
-        required: true
       aws-ecr-deployer-role-arn:
         description: 'Role ARN to assume for ECR'
         required: true
@@ -81,10 +78,6 @@ jobs:
           context: .
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-      - name: Kill the existing pod
-        run: |
-          aws eks --region us-east-1 update-kubeconfig --name ${{ secrets.aws-eks-cluster }}
-          kubectl delete pod -l app=${{ inputs.rust-binary-name }}
       - # Temp fix
         # https://github.com/docker/build-push-action/issues/252
         # https://github.com/moby/buildkit/issues/1896
