@@ -101,7 +101,8 @@ jobs:
           context: .
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-          ssh: default=${{ env.SSH_AUTH_SOCK }}
+          ssh: | 
+            default=${{ env.SSH_AUTH_SOCK }}
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
       - # Temp fix
