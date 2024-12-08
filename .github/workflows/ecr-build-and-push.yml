@@ -71,6 +71,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
       - name: Setup ssh-agent
+        id: ssh-agent
         if: ${{ inputs.requires-private-deps == true }}
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -100,7 +101,7 @@ jobs:
           context: .
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-          ssh: default
+          ssh: default=${{ env.SSH_AUTH_SOCK }}
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
       - # Temp fix
