@@ -18,6 +18,11 @@ on:
         required: false
         default: false
         type: boolean
+      dockerfile-path:
+        description: 'Dockerfile to use'
+        required: false
+        default: 'Dockerfile'
+        type: string
     secrets: 
       aws-ecr-repository:
         description: 'ECR repository to push to'
@@ -113,6 +118,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/x86_64 
           context: .
+          file: ${{ inputs.dockerfile-path }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
           ssh: | 
