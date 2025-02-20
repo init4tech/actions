@@ -82,7 +82,8 @@ jobs:
 
   rustfmt:
     name: Rustfmt
-    runs-on: ubuntu-24.04-arm
+    runs-on: 
+      group: init4-runners
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
