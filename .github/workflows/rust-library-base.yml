@@ -1,0 +1,174 @@
+name: 'Rust Base CI'
+on:
+  workflow_call:
+    inputs:
+      rust-channel:
+        description: 'Rust channel to use'
+        required: false
+        default: 'stable'
+        type: string
+      install-foundry:
+        description: 'Installs foundry as a pre-test step'
+        required: false
+        default: false
+        type: boolean
+      require-lockfile:
+        description: 'Require a Cargo.lock file to be present'
+        required: false
+        default: false
+        type: boolean
+      os:
+        description: 'sets the OS'
+        required: false
+        default: 'ubuntu-latest'
+        type: string
+      requires-private-deps:
+        description: 'Requires private dependencies to be fetched, sets up ssh-agent'
+        required: false
+        default: false
+        type: boolean
+      rust-profile:
+        description: 'The profile to give to cargo for running, defaults to dev'
+        required: false
+        default: 'dev'
+        type: string
+    secrets:
+      SSH_PRIVATE_KEY:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
+      SSH_PRIVATE_KEY_2:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
+      SSH_PRIVATE_KEY_3:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
+jobs:
+  test:
+    name: Test Suite
+    runs-on:
+      group: init4-runners
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup ssh-agent
+        if: ${{ inputs.requires-private-deps == true }}
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
+            ${{ secrets.SSH_PRIVATE_KEY_2 }}
+            ${{ secrets.SSH_PRIVATE_KEY_3 }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - name: Optional Foundry Install
+        if: ${{ inputs.install-foundry == true }}
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      - if: ${{ inputs.require-lockfile == true }}
+        name: Run tests
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: |
+          cargo nextest run --all-features --workspace --locked  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
+      - if: ${{ inputs.require-lockfile == false }}
+        name: Run tests
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: |
+          cargo nextest run --all-features --workspace  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
+
+  feature-checks:
+    name: Feature Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+      - run: cargo clippy --all-targets --all-features
+      - run: cargo clippy --all-targets --no-default-features
+
+  rustfmt:
+    name: Rustfmt
+    runs-on:
+      group: init4-runners
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo fmt --all --check
+
+  clippy:
+    name: Clippy
+    runs-on:
+      group: init4-runners
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup ssh-agent
+        if: ${{ inputs.requires-private-deps == true }}
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
+            ${{ secrets.SSH_PRIVATE_KEY_2 }}
+            ${{ secrets.SSH_PRIVATE_KEY_3 }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - if: ${{ inputs.require-lockfile == true }}
+        name: Clippy check
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo clippy --all-targets --all-features --workspace --locked --profile ${{ inputs.rust-profile }} -- -D warnings
+      - if: ${{ inputs.require-lockfile == false }}
+        name: Clippy check
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo clippy --all-targets --all-features --workspace  --profile ${{ inputs.rust-profile }} -- -D warnings
+
+  docs:
+    name: Docs
+    runs-on:
+      group: init4-runners
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup ssh-agent
+        if: ${{ inputs.requires-private-deps == true }}
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
+            ${{ secrets.SSH_PRIVATE_KEY_2 }}
+            ${{ secrets.SSH_PRIVATE_KEY_3 }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - if: ${{ inputs.require-lockfile == true }}
+        name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }} --locked
+      - if: ${{ inputs.require-lockfile == false }}
+        name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }}
