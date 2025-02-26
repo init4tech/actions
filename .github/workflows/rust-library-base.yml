@@ -8,7 +8,7 @@ on:
 jobs:
   rust-base-checks:
     name: Base Checks
-    uses: init4tech/actions/.github/workflows/rust-base.yml@main
+    uses: init4tech/actions/.github/workflows/rust-base.yml
 
 
   feature-checks:
