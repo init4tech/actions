@@ -1,9 +1,47 @@
 name: 'Rust Library Base CI'
 on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_call:
+    inputs:
+      rust-channel:
+        description: 'Rust channel to use'
+        required: false
+        default: 'stable'
+        type: string
+      install-foundry:
+        description: 'Installs foundry as a pre-test step'
+        required: false
+        default: false
+        type: boolean
+      require-lockfile:
+        description: 'Require a Cargo.lock file to be present'
+        required: false
+        default: false
+        type: boolean
+      os:
+        description: 'sets the OS'
+        required: false
+        default: 'ubuntu-latest'
+        type: string
+      requires-private-deps:
+        description: 'Requires private dependencies to be fetched, sets up ssh-agent'
+        required: false
+        default: false
+        type: boolean
+      rust-profile:
+        description: 'The profile to give to cargo for running, defaults to dev'
+        required: false
+        default: 'dev'
+        type: string
+    secrets:
+      SSH_PRIVATE_KEY:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
+      SSH_PRIVATE_KEY_2:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
+      SSH_PRIVATE_KEY_3:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
 
 jobs:
   rust-base-checks:
