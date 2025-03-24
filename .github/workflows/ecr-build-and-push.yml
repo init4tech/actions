@@ -76,7 +76,7 @@ jobs:
       - name: Setup ssh-agent
         id: ssh-agent
         if: ${{ inputs.requires-private-deps == true }}
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: |
             ${{ secrets.SSH_PRIVATE_KEY }}            
