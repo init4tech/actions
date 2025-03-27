@@ -17,11 +17,6 @@ on:
         required: false
         default: false
         type: boolean
-      os:
-        description: 'sets the OS'
-        required: false
-        default: 'ubuntu-latest'
-        type: string
       requires-private-deps:
         description: 'Requires private dependencies to be fetched, sets up ssh-agent'
         required: false
