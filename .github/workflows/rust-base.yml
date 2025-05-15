@@ -75,6 +75,19 @@ jobs:
         run: |
           cargo nextest run --all-features --workspace  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
 
+  # We need a separate job for doctests because they are not run in the main test job with nextest.
+  doctest:
+    runs-on:
+      group: init4-runners
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo test --workspace --doc
+
   rustfmt:
     name: Rustfmt
     runs-on: 
