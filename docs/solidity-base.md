@@ -24,3 +24,11 @@ solidity-base:
 **Type**: `number`
 
 **Default Value:** `1`
+
+### `foundry-profile`
+
+**Description:** Sets the FOUNDRY_PROFILE env variable for all forge steps (build, format, test) except for generating the gas report, which always uses FOUNDRY_PROFILE=snapshot.
+
+**Type**: `string`
+
+**Default Value:** `ci`

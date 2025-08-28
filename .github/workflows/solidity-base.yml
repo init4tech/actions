@@ -13,6 +13,11 @@ on:
         required: false
         default: 1
         type: number
+      foundry-profile:
+        description: 'Foundry profile to use for testing'
+        required: false
+        default: 'ci'
+        type: string
 
 permissions:
   actions: read
@@ -21,7 +26,7 @@ permissions:
   repository-projects: read
 
 env:
-  FOUNDRY_PROFILE: ci
+  FOUNDRY_PROFILE: ${{ inputs.foundry-profile }}
 
 jobs:
   check:
