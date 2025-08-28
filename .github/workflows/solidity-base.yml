@@ -18,6 +18,11 @@ on:
         required: false
         default: 'ci'
         type: string
+      fork-url:
+        description: 'Fork URL to use for Fork testing.'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   actions: read
@@ -55,9 +60,17 @@ jobs:
         id: fmt
 
       - name: Run Forge tests
+        if: ${{ inputs.fork-url == '' }}
         run: |
           forge test -vvv
         id: test
+
+      - name: Run Fork tests
+        if: ${{ inputs.fork-url != '' }}
+        run: |
+          forge test -vvv --fork-url ${{ inputs.fork-url }}
+        id: fork-test
+
       # do not run if disable-gas-snapshot is true
       - name: Compare gas reports
         if: ${{ !inputs.disable-gas-snapshot }}
