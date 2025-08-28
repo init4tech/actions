@@ -32,3 +32,11 @@ solidity-base:
 **Type**: `string`
 
 **Default Value:** `ci`
+
+### `fork-url`
+
+**Description:** If set, skips local Forge tests and instead runs Forge tests with `--fork-url` flag passing in the provided RPC URL. Repos implementing fork tests can create a Foundry profile that specifies the path of the fork tests, and run the solidity-base workflow passing in `foundry-profile` and `fork-url` tags.
+
+**Type**: `string`
+
+**Default Value:** ``
