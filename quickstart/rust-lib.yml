@@ -1,0 +1,13 @@
+name: Rust CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-library-base:
+    uses: init4tech/actions/.github/workflows/rust-library-base.yml@main
