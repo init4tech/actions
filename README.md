@@ -13,7 +13,29 @@
 
 ## Init4 Github Actions Developer Getting Started Guide
 
-Welcome to the getting started guide for using Init4's shared Github Actions workflows. The goal of this repository is to give developers standard and secure building blocks to bootstrap CI in their repositories quickly and with minimal action configuration.
+This repository gives developers standard and secure building blocks to bootstrap CI in their repositories quickly and with minimal action configuration.
+
+### Quickstart:
+
+Simply download the quickstart workflow that matches your project type into the `.github/workflows/` directory in your repository:
+
+For a rust binary:
+
+```
+$ curl -o .github/workflows/rust-bin.yml https://raw.githubusercontent.com/init4tech/actions/refs/heads/main/quickstart/rust-bin.yml
+```
+
+For a rust library:
+
+```
+$ curl -o .github/workflows/rust-lib.yml https://raw.githubusercontent.com/init4tech/actions/refs/heads/main/quickstart/rust-lib.yml
+```
+
+For a solidity project:
+
+```
+$ curl -o .github/workflows/solidity.yml https://raw.githubusercontent.com/init4tech/actions/refs/heads/main/quickstart/solidity.yml
+```
 
 ### Workflows Overview
 
@@ -28,23 +50,23 @@ To fix this issue here at Init4 we can leverage the shared workflows contained i
 3. Add a CODEOWNERS file at `.github/CODEOWNERS`
 4. Create your CI workflow using one of our `*-base.yml` workflows to start
 
-    `solidity-base.yml` example (see `examples` folder for others)
+   `solidity-base.yml` example (see `examples` folder for others)
 
-    ```yml
-    name: CI
-    # executes automatically on pull requests and pushes to main
-    on:
-      pull_request:
-      push:
-        branches:
-        - main
-      workflow_dispatch:
+   ```yml
+   name: CI
+   # executes automatically on pull requests and pushes to main
+   on:
+     pull_request:
+     push:
+       branches:
+         - main
+     workflow_dispatch:
 
-    # the only configuration needed for the solidity-base workflow
-    jobs:
-      solidity-base:
-        uses: init4tech/actions/.github/workflows/solidity-base.yml@main
-    ```
+   # the only configuration needed for the solidity-base workflow
+   jobs:
+     solidity-base:
+       uses: init4tech/actions/.github/workflows/solidity-base.yml@main
+   ```
 
 5. You now have a fully initialized repository, go code!
 
@@ -55,21 +77,22 @@ To fix this issue here at Init4 we can leverage the shared workflows contained i
 1. Find the workflow to modify in the directory `.github/workflows/`
 2. Add a new `input:` parameter of type `boolean` to the workflow with the default set to `false`
 3. Add a new step and include an `if:` block to check your new input parameter and optionally install your dependency
-    - for an example, see the "Optional Foundry install Step" below:
-  
-    ```yml
-          steps:
-        - name: Checkout repository
-          uses: actions/checkout@v3
-        - name: Install Rust toolchain
-          uses: dtolnay/rust-toolchain@stable
-        - uses: Swatinem/rust-cache@v2
-        - name: Optional Foundry Install
-          if: ${{ github.event.inputs.install-foundry == 'true' }}
-          uses: foundry-rs/foundry-toolchain@v1
-          with:
-            version: nightly
-        - name: Run tests
-          run: |
-            cargo test --all-features --workspace
-    ```
+
+   - for an example, see the "Optional Foundry install Step" below:
+
+   ```yml
+         steps:
+       - name: Checkout repository
+         uses: actions/checkout@v3
+       - name: Install Rust toolchain
+         uses: dtolnay/rust-toolchain@stable
+       - uses: Swatinem/rust-cache@v2
+       - name: Optional Foundry Install
+         if: ${{ github.event.inputs.install-foundry == 'true' }}
+         uses: foundry-rs/foundry-toolchain@v1
+         with:
+           version: nightly
+       - name: Run tests
+         run: |
+           cargo test --all-features --workspace
+   ```
