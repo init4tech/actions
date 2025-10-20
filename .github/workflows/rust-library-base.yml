@@ -47,11 +47,10 @@ jobs:
   rust-base-checks:
     name: Base Checks
     uses: init4tech/actions/.github/workflows/rust-base.yml@main
-
-
   feature-checks:
     name: Feature Checks
-    runs-on: ubuntu-latest
+    runs-on:
+      group: init4-runners
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
