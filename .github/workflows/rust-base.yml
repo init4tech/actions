@@ -29,7 +29,7 @@ on:
         type: string
       cargo-build-jobs:
         description: 'The number of concurrent build/compilation jobs, reasonable default is cores/2'
-        type: string 
+        type: string
         default: '4'
         required: false
     secrets:
