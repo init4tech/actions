@@ -79,7 +79,6 @@ jobs:
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CARGO_BUILD_JOBS: ${{ inputs.cargo-build-jobs }}
-
         run: |
           cargo nextest run --all-features --workspace  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
 
