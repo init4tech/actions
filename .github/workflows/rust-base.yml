@@ -27,6 +27,11 @@ on:
         required: false
         default: 'dev'
         type: string
+      cargo-build-jobs:
+        description: 'The number of concurrent build/compilation jobs, reasonable default is cores/2'
+        type: string
+        default: '4'
+        required: false
     secrets:
       SSH_PRIVATE_KEY:
         description: 'SSH private key for fetching private dependencies'
@@ -66,12 +71,14 @@ jobs:
         name: Run tests
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
+          CARGO_BUILD_JOBS: ${{ inputs.cargo-build-jobs }}
         run: |
           cargo nextest run --all-features --workspace --locked  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
       - if: ${{ inputs.require-lockfile == false }}
         name: Run tests
         env: 
           CARGO_NET_GIT_FETCH_WITH_CLI: true
+          CARGO_BUILD_JOBS: ${{ inputs.cargo-build-jobs }}
         run: |
           cargo nextest run --all-features --workspace  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
 
