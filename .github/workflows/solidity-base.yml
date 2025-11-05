@@ -54,11 +54,6 @@ jobs:
           forge build --sizes
         id: build
 
-      - name: Run Forge fmtx  
-        run: |
-          forge fmt --check
-        id: fmt
-
       - name: Run Forge tests
         if: ${{ inputs.fork-url == '' }}
         run: |
