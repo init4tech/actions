@@ -1,0 +1,18 @@
+name: Build and Push to GHCR
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
+# Example of building and pushing a Docker image to GitHub Container Registry
+jobs:
+  build-and-push:
+    uses: init4tech/actions/.github/workflows/ghcr.yml@main
+

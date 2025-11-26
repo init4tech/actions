@@ -1,20 +1,21 @@
-# github-release-binaries.yml
+# solidity-deployment.yml
 
 ## Base Usage
 
 ```yml
-release-binaries:
-  uses: init4tech/actions/.github/workflows/auto-release.yml@main
+deploy:
+  uses: init4tech/actions/.github/workflows/solidity-deployment.yml@main
   with:
     network: 'holesky'
     chain-id: '17000'
-    environment: 'production'
-    forge-deployment-contract: 'ForgeDeployment'
-    forge-deployment-signature: 'deploy'
-    forge-deployment-script-file: 'deploy.js'
+    deployer-address: ${{ secrets.DEPLOYER_ADDRESS }}
     etherscan-url: 'https://holesky.etherscan.io'
+    environment: 'production'
+    forge-deployment-contract: 'DeployContract'
+    forge-deployment-signature: 'deploy()'
+    forge-deployment-script-file: 'DeployContract.s.sol'
   secrets:
-    aws-role: ${{ secrets.AWS_ROLE }}
+    aws-deployer-role: ${{ secrets.AWS_DEPLOYER_ROLE }}
     kms-key-id: ${{ secrets.KMS_KEY_ID }}
     rpc-url: ${{ secrets.RPC_URL }}
     etherscan-api-key: ${{ secrets.ETHERSCAN_API_KEY }}
@@ -24,35 +25,37 @@ release-binaries:
 
 ### `network`
 
-**Description:** The evm network to deploy to
+**Description:** The EVM network to deploy to
 
-**Type**: `choice`
+**Type**: `string`
 
-**Choices**:
-- `holesky`
+**Default Value:** `holesky`
 
 ### `chain-id`
 
-**Description:** Chain ID for the network
+**Description:** Chain ID of the network
 
-**Type**: `choice`
+**Type**: `string`
 
-**Choices**:
-- `17000`
+**Default Value:** `17000`
+
+### `deployer-address`
+
+**Description:** Address of the deployer account
+
+**Type**: `string`
 
 ### `etherscan-url`
 
 **Description:** The base URL for etherscan for the network
 
-**Type**: `choice`
+**Type**: `string`
 
-**Choices**:
-- `https://holesky.etherscan.io`
-
+**Default Value:** `https://holesky.etherscan.io`
 
 ### `environment`
 
-**Description:** Github Environment to deploy from; contains required secrets
+**Description:** GitHub Environment to deploy from; contains required secrets
 
 **Type**: `string`
 
@@ -68,15 +71,25 @@ release-binaries:
 
 **Type**: `string`
 
+**Default Value:** `deploy()`
+
 ### `forge-deployment-script-file`
 
-**Description:** Name of the file containing the deploy script
+**Description:** Name of the deployment script file
+
+**Type**: `string`
+
+## Optional Parameters
+
+### `forge-deployment-params`
+
+**Description:** Parameters for the deployment script
 
 **Type**: `string`
 
 ## Required Secrets
 
-### `aws-role`
+### `aws-deployer-role`
 
 **Description:** AWS Role to assume
 

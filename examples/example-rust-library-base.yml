@@ -1,0 +1,15 @@
+name: CI # Continuous Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Example of using the rust-library-base workflow for library projects
+# This workflow includes feature checks in addition to the base rust checks
+jobs:
+  rust-library-base:
+    uses: init4tech/actions/.github/workflows/rust-library-base.yml@main
+    with:
+      require-lockfile: true
+

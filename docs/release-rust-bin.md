@@ -1,4 +1,4 @@
-# github-release-binaries.yml
+# release-rust-bin.yml
 
 ## Base Usage
 
