@@ -1,0 +1,54 @@
+name: S3 Upload
+
+on:
+  workflow_call:
+    inputs:
+      s3_bucket_name:
+        description: 'S3 bucket name to upload to'
+        required: true
+        type: string
+      deployer_role_arn:
+        description: 'IAM role ARN to assume for S3 deployment'
+        required: true
+        type: string
+      aws_region:
+        description: 'AWS region'
+        required: false
+        default: 'us-east-1'
+        type: string
+      source_path:
+        description: 'Source path to upload (defaults to repository root)'
+        required: false
+        default: '.'
+        type: string
+      delete:
+        description: 'Delete files in S3 that are not in the source'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  id-token: write # Required for requesting the JWT
+  contents: read  # Required for actions/checkout
+
+jobs:
+  upload:
+    name: Upload to S3
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.deployer_role_arn }}
+          role-session-name: github_federated_aws
+          aws-region: ${{ inputs.aws_region }}
+      - name: Upload to S3
+        run: |
+          if [ "${{ inputs.delete }}" = "true" ]; then
+            aws s3 sync ${{ inputs.source_path }} s3://${{ inputs.s3_bucket_name }} --delete --sse AES256
+          else
+            aws s3 sync ${{ inputs.source_path }} s3://${{ inputs.s3_bucket_name }} --sse AES256
+          fi
+

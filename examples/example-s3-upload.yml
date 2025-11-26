@@ -1,0 +1,22 @@
+name: Deploy to S3
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  upload:
+    uses: init4tech/actions/.github/workflows/s3-upload.yml@main
+    with:
+      s3_bucket_name: 'my-static-website-bucket'
+      deployer_role_arn: 'arn:aws:iam::123456789012:role/S3DeployerRole'
+      aws_region: 'us-east-1'
+      source_path: './dist'
+      delete: true
+
