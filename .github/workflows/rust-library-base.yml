@@ -49,10 +49,10 @@ jobs:
     uses: init4tech/actions/.github/workflows/rust-base.yml@main
     with:
       test-all-features: true
+      require-lockfile: false
       cargo-build-jobs: ${{ inputs.cargo-build-jobs }}
       rust-channel: ${{ inputs.rust-channel }}
       install-foundry: ${{ inputs.install-foundry }}
-      require-lockfile: false
       requires-private-deps: ${{ inputs.requires-private-deps }}
       rust-profile: ${{ inputs.rust-profile }}
     secrets: inherit
