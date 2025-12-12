@@ -2,6 +2,11 @@ name: 'Rust Base CI'
 on:
   workflow_call:
     inputs:
+      all-features:
+        description: 'Build with all features enabled'
+        required: false
+        default: true
+        type: boolean
       rust-channel:
         description: 'Rust channel to use'
         required: false
@@ -36,7 +41,7 @@ on:
       SSH_PRIVATE_KEY:
         description: 'SSH private key for fetching private dependencies'
         required: false
-      SSH_PRIVATE_KEY_2: 
+      SSH_PRIVATE_KEY_2:
         description: 'SSH private key for fetching private dependencies'
         required: false
       SSH_PRIVATE_KEY_3:
@@ -45,7 +50,7 @@ on:
 jobs:
   test:
     name: Test Suite
-    runs-on: 
+    runs-on:
       group: init4-runners
     steps:
       - name: Checkout repository
@@ -55,7 +60,7 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: |
-            ${{ secrets.SSH_PRIVATE_KEY }}            
+            ${{ secrets.SSH_PRIVATE_KEY }}
             ${{ secrets.SSH_PRIVATE_KEY_2 }}
             ${{ secrets.SSH_PRIVATE_KEY_3 }}
       - name: Install Rust toolchain
@@ -69,18 +74,18 @@ jobs:
           version: nightly
       - if: ${{ inputs.require-lockfile == true }}
         name: Run tests
-        env: 
+        env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CARGO_BUILD_JOBS: ${{ inputs.cargo-build-jobs }}
         run: |
-          cargo nextest run --all-features --workspace --locked  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
+          cargo nextest run ${{ inputs.all-features && '--all-features' || '' }} --workspace --locked  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
       - if: ${{ inputs.require-lockfile == false }}
         name: Run tests
-        env: 
+        env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CARGO_BUILD_JOBS: ${{ inputs.cargo-build-jobs }}
         run: |
-          cargo nextest run --all-features --workspace  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
+          cargo nextest run ${{ inputs.all-features && '--all-features' || '' }} --workspace  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
 
   # We need a separate job for doctests because they are not run in the main test job with nextest.
   doctest:
@@ -93,11 +98,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - run: cargo test --workspace --doc
+      - run: cargo test --workspace --doc ${{ inputs.all-features && '--all-features' || '' }}
 
   rustfmt:
     name: Rustfmt
-    runs-on: 
+    runs-on:
       group: init4-runners
     steps:
       - name: Checkout repository
@@ -108,13 +113,13 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
       - name: Check formatting
-        env: 
+        env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo fmt --all --check
 
   clippy:
     name: Clippy
-    runs-on: 
+    runs-on:
       group: init4-runners
     steps:
       - name: Checkout repository
@@ -124,7 +129,7 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: |
-            ${{ secrets.SSH_PRIVATE_KEY }}            
+            ${{ secrets.SSH_PRIVATE_KEY }}
             ${{ secrets.SSH_PRIVATE_KEY_2 }}
             ${{ secrets.SSH_PRIVATE_KEY_3 }}
       - name: Install Rust toolchain
@@ -134,18 +139,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - if: ${{ inputs.require-lockfile == true }}
         name: Clippy check
-        env: 
+        env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets --all-features --workspace --locked --profile ${{ inputs.rust-profile }} -- -D warnings
+        run: cargo clippy --all-targets ${{ inputs.all-features && '--all-features' || '' }} --workspace --locked --profile ${{ inputs.rust-profile }} -- -D warnings
       - if: ${{ inputs.require-lockfile == false }}
         name: Clippy check
-        env: 
+        env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets --all-features --workspace  --profile ${{ inputs.rust-profile }} -- -D warnings
+        run: cargo clippy --all-targets ${{ inputs.all-features && '--all-features' || '' }} --workspace  --profile ${{ inputs.rust-profile }} -- -D warnings
 
   docs:
     name: Docs
-    runs-on: 
+    runs-on:
       group: init4-runners
     steps:
       - name: Checkout repository
@@ -155,7 +160,7 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: |
-            ${{ secrets.SSH_PRIVATE_KEY }}            
+            ${{ secrets.SSH_PRIVATE_KEY }}
             ${{ secrets.SSH_PRIVATE_KEY_2 }}
             ${{ secrets.SSH_PRIVATE_KEY_3 }}
       - name: Install Rust toolchain
@@ -166,10 +171,10 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }} --locked
+        run: cargo doc --no-deps --document-private-items ${{ inputs.all-features && '--all-features' || '' }} --workspace --examples --profile ${{ inputs.rust-profile }} --locked
       - if: ${{ inputs.require-lockfile == false }}
         name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }}
+        run: cargo doc --no-deps --document-private-items ${{ inputs.all-features && '--all-features' || '' }} --workspace --examples --profile ${{ inputs.rust-profile }}
