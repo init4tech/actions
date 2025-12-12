@@ -2,6 +2,11 @@ name: 'Rust Library Base CI'
 on:
   workflow_call:
     inputs:
+      test-all-features:
+        description: 'Build with all features enabled'
+        required: false
+        default: true
+        type: boolean
       rust-channel:
         description: 'Rust channel to use'
         required: false
@@ -32,6 +37,11 @@ on:
         required: false
         default: 'dev'
         type: string
+      cargo-build-jobs:
+        description: 'The number of concurrent build/compilation jobs, reasonable default is cores/2'
+        type: string
+        default: '4'
+        required: false
     secrets:
       SSH_PRIVATE_KEY:
         description: 'SSH private key for fetching private dependencies'
@@ -49,6 +59,12 @@ jobs:
     uses: init4tech/actions/.github/workflows/rust-base.yml@main
     with:
       test-all-features: true
+      rust-channel: ${{ inputs.rust-channel }}
+      install-foundry: ${{ inputs.install-foundry }}
+      require-lockfile: ${{ inputs.require-lockfile }}
+      requires-private-deps: ${{ inputs.requires-private-deps }}
+      rust-profile: ${{ inputs.rust-profile }}
+    secrets: inherit
   feature-checks:
     name: Feature Checks
     runs-on:
