@@ -2,7 +2,7 @@ name: 'Rust Base CI'
 on:
   workflow_call:
     inputs:
-      all-features:
+      test-all-features:
         description: 'Build with all features enabled'
         required: false
         default: true
@@ -78,14 +78,14 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CARGO_BUILD_JOBS: ${{ inputs.cargo-build-jobs }}
         run: |
-          cargo nextest run ${{ inputs.all-features && '--all-features' || '' }} --workspace --locked  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
+          cargo nextest run ${{ inputs.test-all-features && '--all-features' || '' }} --workspace --locked  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
       - if: ${{ inputs.require-lockfile == false }}
         name: Run tests
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CARGO_BUILD_JOBS: ${{ inputs.cargo-build-jobs }}
         run: |
-          cargo nextest run ${{ inputs.all-features && '--all-features' || '' }} --workspace  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
+          cargo nextest run ${{ inputs.test-all-features && '--all-features' || '' }} --workspace  --cargo-profile ${{ inputs.rust-profile }} --no-tests=warn
 
   # We need a separate job for doctests because they are not run in the main test job with nextest.
   doctest:
@@ -141,12 +141,12 @@ jobs:
         name: Clippy check
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets ${{ inputs.all-features && '--all-features' || '' }} --workspace --locked --profile ${{ inputs.rust-profile }} -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace --locked --profile ${{ inputs.rust-profile }} -- -D warnings
       - if: ${{ inputs.require-lockfile == false }}
         name: Clippy check
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets ${{ inputs.all-features && '--all-features' || '' }} --workspace  --profile ${{ inputs.rust-profile }} -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace  --profile ${{ inputs.rust-profile }} -- -D warnings
 
   docs:
     name: Docs
@@ -171,10 +171,10 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items ${{ inputs.all-features && '--all-features' || '' }} --workspace --examples --profile ${{ inputs.rust-profile }} --locked
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }} --locked
       - if: ${{ inputs.require-lockfile == false }}
         name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items ${{ inputs.all-features && '--all-features' || '' }} --workspace --examples --profile ${{ inputs.rust-profile }}
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }}

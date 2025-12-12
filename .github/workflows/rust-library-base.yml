@@ -48,7 +48,7 @@ jobs:
     name: Base Checks
     uses: init4tech/actions/.github/workflows/rust-base.yml@main
     with:
-      all-features: true
+      test-all-features: true
   feature-checks:
     name: Feature Checks
     runs-on:
