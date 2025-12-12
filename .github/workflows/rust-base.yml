@@ -98,7 +98,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - run: cargo test --workspace --doc ${{ inputs.all-features && '--all-features' || '' }}
+      - run: cargo test --workspace --doc ${{ inputs.test-all-features && '--all-features' || '' }}
 
   rustfmt:
     name: Rustfmt

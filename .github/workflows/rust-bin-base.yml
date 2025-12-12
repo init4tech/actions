@@ -2,7 +2,6 @@ name: 'Rust Binary Base CI'
 on:
   workflow_call:
     inputs:
-
       rust-channel:
         description: 'Rust channel to use'
         required: false
