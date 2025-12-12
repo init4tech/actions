@@ -3,7 +3,7 @@ on:
   workflow_call:
     inputs:
       test-all-features:
-        description: 'Build with all features enabled'
+        description: 'Test with all features enabled'
         required: false
         default: true
         type: boolean
