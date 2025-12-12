@@ -1,7 +1,8 @@
-name: 'Rust Library Base CI'
+name: 'Rust Binary Base CI'
 on:
   workflow_call:
     inputs:
+
       rust-channel:
         description: 'Rust channel to use'
         required: false
@@ -48,11 +49,11 @@ jobs:
     name: Base Checks
     uses: init4tech/actions/.github/workflows/rust-base.yml@main
     with:
-      test-all-features: true
+      test-all-features: false
       cargo-build-jobs: ${{ inputs.cargo-build-jobs }}
       rust-channel: ${{ inputs.rust-channel }}
       install-foundry: ${{ inputs.install-foundry }}
-      require-lockfile: false
+      require-lockfile: true
       requires-private-deps: ${{ inputs.requires-private-deps }}
       rust-profile: ${{ inputs.rust-profile }}
     secrets: inherit
