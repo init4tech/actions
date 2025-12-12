@@ -12,7 +12,7 @@ permissions: # these permissions are required for the actions to run
   contents: write
 
 jobs:
-  auto-release: # this job will create a new tag and release
-    uses: init4tech/actions/.github/workflows/auto-release.yml@main
+  auto-release: # this job will create a new tag and release based on Cargo.toml version
+    uses: init4tech/actions/.github/workflows/auto-release-rust.yml@main
     with:
       binary-name: 'my-binary' # the name of the binary that will be used for versioning the release
