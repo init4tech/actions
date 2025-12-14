@@ -1,4 +1,4 @@
-name: 'Rust Library Base CI'
+name: 'Rust Binary Base CI'
 on:
   workflow_call:
     inputs:
@@ -48,8 +48,8 @@ jobs:
     name: Base Checks
     uses: init4tech/actions/.github/workflows/rust-base.yml@main
     with:
-      test-all-features: true
-      require-lockfile: false
+      test-all-features: false
+      require-lockfile: true
       cargo-build-jobs: ${{ inputs.cargo-build-jobs }}
       rust-channel: ${{ inputs.rust-channel }}
       install-foundry: ${{ inputs.install-foundry }}
