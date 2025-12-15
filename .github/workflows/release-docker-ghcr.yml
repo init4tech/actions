@@ -89,7 +89,7 @@ jobs:
         - release_docker
       steps:
         - name: Download digests
-          uses: actions/download-artifact@v6
+          uses: actions/download-artifact@v7
           with:
             path: /tmp/digests
             pattern: digests-*
