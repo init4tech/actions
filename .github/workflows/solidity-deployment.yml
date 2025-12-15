@@ -95,7 +95,7 @@ jobs:
             --delay 5 \
             ${{ inputs.forge-deployment-params }}
       - name: Upload Transaction Json
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: transaction-json
           path: broadcast/${{ inputs.forge-deployment-script-file }}/${{ inputs.chain-id }}/run-latest.json
