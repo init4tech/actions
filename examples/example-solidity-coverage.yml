@@ -1,0 +1,12 @@
+name: Code Coverage
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Example of using the solidity-coverage workflow to check code coverage
+jobs:
+  coverage:
+    uses: init4tech/actions/.github/workflows/solidity-coverage.yml@main
+

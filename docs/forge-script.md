@@ -1,13 +1,13 @@
-# github-release-binaries.yml
+# forge-script.yml
 
 ## Base Usage
 
 ```yml
 forge-script:
-  uses: init4tech/actions/.github/workflows/auto-release.yml@main
+  uses: init4tech/actions/.github/workflows/forge-script.yml@main
   with:
     github-environment: 'dev'
-    forge-script-contract: '0x0000000000000000000000000000000000000000'
+    forge-script-contract: 'MyScript'
     forge-script-signature: 'myFunction(address,uint256)'
     forge-script-params: '0x0000000000000000000000000000000000000000 123'
 ```
@@ -16,13 +16,13 @@ forge-script:
 
 ### `github-environment`
 
-**Description:** The github environment to use for the release
+**Description:** The GitHub environment to use (contains required secrets)
 
 **Type**: `string`
 
 ### `forge-script-contract`
 
-**Description:** The forge script contract to use for the release
+**Description:** Name of the script contract to run
 
 **Type**: `string`
 

@@ -41,14 +41,19 @@ jobs:
       generate-tag: true
       custom-tag: ${{ github.event.inputs.custom-tag }}
   deploy-contract: # this job will deploy the contract
-    uses: init4tech/actions/.github/workflows/deploy-contract.yml@main
+    uses: init4tech/actions/.github/workflows/solidity-deployment.yml@main
     needs: auto-release
     with:
       network: ${{ github.event.inputs.network }}
+      chain-id: '17000'
+      deployer-address: ${{ secrets.DEPLOYER_ADDRESS }}
+      etherscan-url: 'https://holesky.etherscan.io'
       environment: ${{ github.event.inputs.environment }}
-      forge-deployment-script: "DeployContract"
+      forge-deployment-contract: 'DeployContract'
+      forge-deployment-signature: 'deploy()'
+      forge-deployment-script-file: 'DeployContract.s.sol'
     secrets:
       aws-deployer-role: ${{ secrets.AWS_DEPLOYER_ROLE }}
-      holesky-kms-key-id: ${{ secrets.HOLESKY_DEPLOYER_KEY_ID }}
-      holesky-rpc-url: ${{ secrets.HOLESKY_RPC_URL }}
+      kms-key-id: ${{ secrets.HOLESKY_DEPLOYER_KEY_ID }}
+      rpc-url: ${{ secrets.HOLESKY_RPC_URL }}
       etherscan-api-key: ${{ secrets.ETHERSCAN_API_KEY }}

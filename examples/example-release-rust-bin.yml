@@ -1,0 +1,19 @@
+name: Release Rust Binary
+
+on:
+  push:
+    tags:
+      - 'v*'
+    # This will trigger when a tag matching v* is pushed (v1.0.0, v2.0.0, etc.)
+
+permissions:
+  contents: write
+
+# This job will build the rust binary for multiple platforms and upload them to the GitHub release
+jobs:
+  release-binary:
+    uses: init4tech/actions/.github/workflows/release-rust-bin.yml@main
+    with:
+      binary-name: 'my-binary'
+      tag: ${{ github.ref_name }}
+
