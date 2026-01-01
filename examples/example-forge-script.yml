@@ -1,0 +1,32 @@
+name: Run Forge Script
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run script in'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+
+permissions:
+  id-token: write
+
+# Example of using the forge-script workflow to run a script contract
+jobs:
+  run-script:
+    uses: init4tech/actions/.github/workflows/forge-script.yml@main
+    with:
+      github-environment: ${{ github.event.inputs.environment }}
+      forge-script-contract: 'MyScript'
+      forge-script-signature: 'run(address,uint256)'
+      forge-script-params: '0x0000000000000000000000000000000000000000 1000000'
+    secrets:
+      aws-role: ${{ secrets.AWS_ROLE }}
+      kms-key-id: ${{ secrets.KMS_KEY_ID }}
+      rpc-url: ${{ secrets.RPC_URL }}
+

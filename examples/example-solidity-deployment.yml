@@ -1,0 +1,46 @@
+name: Deploy Smart Contract
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: 'Network to deploy to'
+        required: true
+        default: 'holesky'
+        type: choice
+        options:
+          - holesky
+          - mainnet
+      environment:
+        description: 'Environment to deploy from'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+
+permissions:
+  contents: write
+  id-token: write
+
+# Example of deploying a smart contract using the solidity-deployment workflow
+jobs:
+  deploy:
+    uses: init4tech/actions/.github/workflows/solidity-deployment.yml@main
+    with:
+      network: ${{ github.event.inputs.network }}
+      chain-id: '17000'
+      deployer-address: ${{ secrets.DEPLOYER_ADDRESS }}
+      etherscan-url: 'https://holesky.etherscan.io'
+      environment: ${{ github.event.inputs.environment }}
+      forge-deployment-contract: 'DeployContract'
+      forge-deployment-signature: 'deploy()'
+      forge-deployment-script-file: 'DeployContract.s.sol'
+    secrets:
+      aws-deployer-role: ${{ secrets.AWS_DEPLOYER_ROLE }}
+      kms-key-id: ${{ secrets.KMS_KEY_ID }}
+      rpc-url: ${{ secrets.RPC_URL }}
+      etherscan-api-key: ${{ secrets.ETHERSCAN_API_KEY }}
+

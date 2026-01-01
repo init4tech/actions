@@ -1,4 +1,4 @@
-# github-release-binaries.yml
+# auto-release.yml
 
 ## Base Usage
 
