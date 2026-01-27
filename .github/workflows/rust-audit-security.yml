@@ -2,60 +2,21 @@ name: 'Rust Security Audit'
 on:
   workflow_call:
     inputs:
-      issue-labels:
-        description: 'Comma-separated labels to apply to created issues'
-        required: false
-        default: 'security,dependencies'
-        type: string
-      issue-assignees:
-        description: 'Comma-separated GitHub usernames to assign to created issues'
-        required: false
-        default: ''
-        type: string
-      issue-milestone:
-        description: 'Milestone name or number to assign to created issues'
-        required: false
-        default: ''
-        type: string
-      deny-warnings:
-        description: 'Fail workflow on audit warnings (not just errors)'
-        required: false
-        default: false
-        type: boolean
       ignore-advisories:
         description: 'Comma-separated advisory IDs to ignore (e.g., RUSTSEC-2021-0001,RUSTSEC-2021-0002)'
         required: false
         default: ''
         type: string
-      requires-private-deps:
-        description: 'Requires private dependencies to be fetched, sets up ssh-agent'
-        required: false
-        default: false
-        type: boolean
-      require-lockfile:
-        description: 'Require a Cargo.lock file to be present and use --locked flag'
-        required: false
-        default: false
-        type: boolean
       working-directory:
         description: 'Directory containing Cargo.toml'
         required: false
         default: '.'
         type: string
-    secrets:
-      SSH_PRIVATE_KEY:
-        description: 'SSH private key for fetching private dependencies'
-        required: false
-      SSH_PRIVATE_KEY_2:
-        description: 'SSH private key for fetching private dependencies'
-        required: false
-      SSH_PRIVATE_KEY_3:
-        description: 'SSH private key for fetching private dependencies'
-        required: false
 
 permissions:
   contents: read
   issues: write
+  checks: write
 
 jobs:
   security-audit:
@@ -66,167 +27,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Setup ssh-agent
-        if: ${{ inputs.requires-private-deps == true }}
-        uses: webfactory/ssh-agent@v0.9.1
+      - name: Run security audit
+        uses: rustsec/audit-check@v2.0.0
         with:
-          ssh-private-key: |
-            ${{ secrets.SSH_PRIVATE_KEY }}
-            ${{ secrets.SSH_PRIVATE_KEY_2 }}
-            ${{ secrets.SSH_PRIVATE_KEY_3 }}
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: ${{ inputs.working-directory }}
-
-      - name: Install cargo-audit
-        env:
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo install cargo-audit --locked
-
-      - name: Run cargo audit
-        id: audit
-        working-directory: ${{ inputs.working-directory }}
-        env:
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
-        continue-on-error: true
-        run: |
-          # Build audit command with flags
-          AUDIT_CMD="cargo audit --json --color never"
-
-          # Add deny level
-          if [ "${{ inputs.deny-warnings }}" = "true" ]; then
-            AUDIT_CMD="$AUDIT_CMD --deny warnings"
-          else
-            AUDIT_CMD="$AUDIT_CMD --deny error"
-          fi
-
-          # Add locked flag if required
-          if [ "${{ inputs.require-lockfile }}" = "true" ]; then
-            AUDIT_CMD="$AUDIT_CMD --locked"
-          fi
-
-          # Add ignore flags for each advisory
-          if [ -n "${{ inputs.ignore-advisories }}" ]; then
-            IFS=',' read -ra ADVISORIES <<< "${{ inputs.ignore-advisories }}"
-            for advisory in "${ADVISORIES[@]}"; do
-              # Trim whitespace
-              advisory=$(echo "$advisory" | xargs)
-              if [ -n "$advisory" ]; then
-                AUDIT_CMD="$AUDIT_CMD --ignore $advisory"
-              fi
-            done
-          fi
-
-          echo "Running: $AUDIT_CMD"
-          eval "$AUDIT_CMD" > audit-results.json || AUDIT_EXIT_CODE=$?
-
-          # Store exit code for later
-          echo "exit_code=${AUDIT_EXIT_CODE:-0}" >> $GITHUB_OUTPUT
-
-          # Always output results for processing
-          cat audit-results.json
-
-      - name: Process vulnerabilities and create issues
-        if: always()
-        working-directory: ${{ inputs.working-directory }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Check if audit results file exists
-          if [ ! -f audit-results.json ]; then
-            echo "No audit results found"
-            exit 0
-          fi
-
-          # Extract vulnerabilities from JSON output
-          VULNS=$(jq -r '.vulnerabilities.list[] | @json' audit-results.json 2>/dev/null || echo "")
-
-          if [ -z "$VULNS" ]; then
-            echo "No vulnerabilities found"
-            exit 0
-          fi
-
-          echo "Processing vulnerabilities..."
-
-          # Process each vulnerability
-          echo "$VULNS" | while IFS= read -r vuln; do
-            # Extract vulnerability details
-            ADVISORY_ID=$(echo "$vuln" | jq -r '.advisory.id')
-            ADVISORY_TITLE=$(echo "$vuln" | jq -r '.advisory.title')
-            PACKAGE=$(echo "$vuln" | jq -r '.package.name')
-            VERSION=$(echo "$vuln" | jq -r '.package.version')
-            DESCRIPTION=$(echo "$vuln" | jq -r '.advisory.description')
-            SEVERITY=$(echo "$vuln" | jq -r '.advisory.cvss // "Unknown"')
-            PATCHED=$(echo "$vuln" | jq -r '.versions.patched | join(", ") // "None specified"')
-            URL=$(echo "$vuln" | jq -r '.advisory.url')
-
-            echo "Processing $ADVISORY_ID - $ADVISORY_TITLE"
-
-            # Check if issue already exists
-            EXISTING_ISSUE=$(gh issue list --search "$ADVISORY_ID in:title" --json number --jq '.[0].number' 2>/dev/null || echo "")
-
-            if [ -n "$EXISTING_ISSUE" ] && [ "$EXISTING_ISSUE" != "null" ]; then
-              echo "  Issue already exists for $ADVISORY_ID (#$EXISTING_ISSUE), skipping..."
-              continue
-            fi
-
-            # Build issue body
-            ISSUE_BODY="## Security Advisory: $ADVISORY_ID
-
-**Package**: \`$PACKAGE\`
-**Affected Version**: \`$VERSION\`
-**Severity**: $SEVERITY
-
-### Description
-$DESCRIPTION
-
-### Patched Versions
-$PATCHED
-
-### References
-- [Advisory Details]($URL)
-- [RustSec Advisory Database](https://rustsec.org/advisories/$ADVISORY_ID)
-
-### Recommendation
-Update the affected package to a patched version or review the advisory for alternative mitigation strategies.
-
----
-*This issue was automatically created by the Rust Security Audit workflow.*"
-
-            # Build gh issue create command
-            ISSUE_CMD="gh issue create --title \"Security: $ADVISORY_ID - $ADVISORY_TITLE\" --body \"$ISSUE_BODY\""
-
-            # Add labels if specified
-            if [ -n "${{ inputs.issue-labels }}" ]; then
-              ISSUE_CMD="$ISSUE_CMD --label \"${{ inputs.issue-labels }}\""
-            fi
-
-            # Add assignees if specified
-            if [ -n "${{ inputs.issue-assignees }}" ]; then
-              ISSUE_CMD="$ISSUE_CMD --assignee \"${{ inputs.issue-assignees }}\""
-            fi
-
-            # Add milestone if specified
-            if [ -n "${{ inputs.issue-milestone }}" ]; then
-              ISSUE_CMD="$ISSUE_CMD --milestone \"${{ inputs.issue-milestone }}\""
-            fi
-
-            # Create the issue
-            echo "  Creating issue for $ADVISORY_ID..."
-            eval "$ISSUE_CMD" || echo "  Failed to create issue for $ADVISORY_ID"
-          done
-
-      - name: Check audit result
-        if: always()
-        run: |
-          EXIT_CODE=${{ steps.audit.outputs.exit_code }}
-          if [ "$EXIT_CODE" != "0" ]; then
-            echo "Security audit failed with exit code $EXIT_CODE"
-            exit $EXIT_CODE
-          fi
-          echo "Security audit passed"
+          token: ${{ github.token }}
+          ignore: ${{ inputs.ignore-advisories }}
+          working-directory: ${{ inputs.working-directory }}
