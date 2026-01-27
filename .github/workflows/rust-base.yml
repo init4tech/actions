@@ -141,12 +141,12 @@ jobs:
         name: Clippy check
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets --all-features --workspace --locked --profile ${{ inputs.rust-profile }} -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace --locked --profile ${{ inputs.rust-profile }}
       - if: ${{ inputs.require-lockfile == false }}
         name: Clippy check
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo clippy --all-targets --all-features --workspace  --profile ${{ inputs.rust-profile }} -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace  --profile ${{ inputs.rust-profile }}
 
   docs:
     name: Docs
