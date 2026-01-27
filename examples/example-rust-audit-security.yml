@@ -1,0 +1,37 @@
+name: Security Audit
+# This workflow runs cargo audit weekly to check for security vulnerabilities
+# and automatically creates GitHub issues for any findings
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch: # Allow manual runs
+
+permissions: # these permissions are required for the workflow to run
+  contents: read  # Required to checkout the repository
+  issues: write   # Required to create issues
+
+jobs:
+  security-audit:
+    uses: init4tech/actions/.github/workflows/rust-audit-security.yml@main
+    with:
+      # Apply custom labels to created issues
+      issue-labels: 'security,dependencies,audit'
+      # Assign issues to security team members
+      issue-assignees: 'security-lead,dev-lead'
+      # Optional: assign to a specific milestone
+      # issue-milestone: 'Security Sprint'
+      # Optional: fail on warnings (not just errors)
+      # deny-warnings: true
+      # Optional: ignore specific advisories
+      # ignore-advisories: 'RUSTSEC-2020-0071'
+      # Optional: for projects with private dependencies
+      # requires-private-deps: true
+      # Optional: require Cargo.lock and use --locked flag
+      # require-lockfile: true
+      # Optional: for monorepos or non-root projects
+      # working-directory: './packages/api'
+    # Uncomment if using private dependencies
+    # secrets:
+    #   SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
