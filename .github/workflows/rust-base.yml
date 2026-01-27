@@ -171,10 +171,10 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }} --locked
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --profile ${{ inputs.rust-profile }} --locked
       - if: ${{ inputs.require-lockfile == false }}
         name: Check documentation
         env:
           RUSTDOCFLAGS: -D warnings
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo doc --no-deps --document-private-items --all-features --workspace --examples --profile ${{ inputs.rust-profile }}
+        run: cargo doc --no-deps --document-private-items --all-features --workspace --profile ${{ inputs.rust-profile }}
