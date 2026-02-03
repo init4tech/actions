@@ -1,0 +1,35 @@
+name: 'Rust Security Audit'
+on:
+  workflow_call:
+    inputs:
+      ignore-advisories:
+        description: 'Comma-separated advisory IDs to ignore (e.g., RUSTSEC-2021-0001,RUSTSEC-2021-0002)'
+        required: false
+        default: ''
+        type: string
+      working-directory:
+        description: 'Directory containing Cargo.toml'
+        required: false
+        default: '.'
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  checks: write
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on:
+      group: init4-runners
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Run security audit
+        uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ github.token }}
+          ignore: ${{ inputs.ignore-advisories }}
+          working-directory: ${{ inputs.working-directory }}
