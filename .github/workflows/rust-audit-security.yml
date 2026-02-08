@@ -27,6 +27,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Generate lockfile if not checked-in to repo
+        run: test -f Cargo.lock || cargo generate-lockfile
+
       - name: Run security audit
         uses: rustsec/audit-check@v2.0.0
         with:
