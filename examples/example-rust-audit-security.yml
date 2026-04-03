@@ -1,6 +1,6 @@
 name: Security Audit
-# This workflow uses rustsec/audit-check to check for security vulnerabilities
-# On scheduled runs: automatically creates GitHub issues for findings
+# This workflow runs cargo audit to check for security vulnerabilities
+# On scheduled runs: creates Linear issues for findings
 # On push/PR: creates status checks that fail when vulnerabilities are found
 
 on:
@@ -14,14 +14,16 @@ on:
       - '**/Cargo.lock'
   workflow_dispatch: # Allow manual runs
 
-permissions: # these permissions are required for the workflow to run
-  contents: read  # Required to checkout the repository
-  issues: write   # Required to create issues (scheduled runs)
-  checks: write   # Required to create status checks (push/PR)
+permissions:
+  contents: read
+  checks: write
 
 jobs:
   security-audit:
     uses: init4tech/actions/.github/workflows/rust-audit-security.yml@main
+    secrets:
+      linear-api-key: ${{ secrets.LINEAR_API_KEY }}
+      linear-team-id: ${{ secrets.LINEAR_TEAM_ID }}
     # Optional: ignore specific advisories
     # with:
     #   ignore-advisories: 'RUSTSEC-2020-0071,RUSTSEC-2021-0001'
