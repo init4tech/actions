@@ -178,11 +178,16 @@ jobs:
       - name: Install nightly toolchain
         if: steps.check.outputs.skip != 'true'
         run: rustup toolchain install ${{ env.NIGHTLY }} --component rustc-dev --component llvm-tools-preview
-      - name: Install dylint tooling
+      - name: Install cargo-dylint
         if: steps.check.outputs.skip != 'true'
         uses: taiki-e/cache-cargo-install-action@v2
         with:
-          tool: cargo-dylint@5.0.0,dylint-link@5.0.0
+          tool: cargo-dylint@5.0.0
+      - name: Install dylint-link
+        if: steps.check.outputs.skip != 'true'
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: dylint-link@5.0.0
       - name: Checkout lints
         if: steps.check.outputs.skip != 'true'
         uses: actions/checkout@v6
