@@ -212,7 +212,7 @@ jobs:
       - name: Run dylint
         if: steps.check.outputs.skip != 'true'
         env:
-          DYLINT_LIBRARY_PATH: .lints/instrument-fields/target/debug
+          DYLINT_LIBRARY_PATH: ${{ github.workspace }}/.lints/instrument-fields/target/debug
           RUSTFLAGS: "-D bare_instrument_fields"
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo +${{ env.NIGHTLY }} dylint --all --no-deps --workspace
