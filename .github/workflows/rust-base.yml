@@ -148,6 +148,75 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo clippy --all-targets --all-features --workspace --profile ${{ inputs.rust-profile }} -- -D warnings
 
+  dylint:
+    name: Dylint
+    runs-on:
+      group: init4-runners
+    env:
+      NIGHTLY: nightly-2026-03-17
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Check for dylint opt-out
+        id: check
+        run: |
+          skip=$(python3 -c "
+          import tomllib
+          with open('Cargo.toml', 'rb') as f:
+              data = tomllib.load(f)
+          print(str(data.get('workspace', {}).get('metadata', {}).get('dylint', {}).get('skip', False)).lower())
+          ")
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+      - name: Setup ssh-agent
+        if: ${{ steps.check.outputs.skip != 'true' && inputs.requires-private-deps == true }}
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
+            ${{ secrets.SSH_PRIVATE_KEY_2 }}
+            ${{ secrets.SSH_PRIVATE_KEY_3 }}
+      - name: Install nightly toolchain
+        if: steps.check.outputs.skip != 'true'
+        run: rustup toolchain install ${{ env.NIGHTLY }} --component rustc-dev --component llvm-tools-preview
+      - name: Install cargo-dylint
+        if: steps.check.outputs.skip != 'true'
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: cargo-dylint@5.0.0
+      - name: Install dylint-link
+        if: steps.check.outputs.skip != 'true'
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: dylint-link@5.0.0
+      - name: Checkout lints
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: init4tech/lints
+          path: .lints
+      - name: Cache lint build
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .lints/instrument-fields/target
+          key: dylint-lint-${{ env.NIGHTLY }}-${{ hashFiles('.lints/instrument-fields/Cargo.lock') }}
+          restore-keys: dylint-lint-${{ env.NIGHTLY }}-
+      - name: Build lints
+        if: steps.check.outputs.skip != 'true'
+        working-directory: .lints/instrument-fields
+        run: cargo +${{ env.NIGHTLY }} build
+      - uses: Swatinem/rust-cache@v2
+        if: steps.check.outputs.skip != 'true'
+        with:
+          prefix-key: dylint
+      - name: Run dylint
+        if: steps.check.outputs.skip != 'true'
+        env:
+          DYLINT_LIBRARY_PATH: ${{ github.workspace }}/.lints/instrument-fields/target/debug
+          RUSTFLAGS: "-D bare_instrument_fields"
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo +${{ env.NIGHTLY }} dylint --all --no-deps --workspace
+
   docs:
     name: Docs
     runs-on:
