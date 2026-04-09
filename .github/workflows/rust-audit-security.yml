@@ -88,33 +88,39 @@ jobs:
 
           TITLE="Security Audit: vulnerabilities found in ${REPO_NAME}"
 
+          # Check for existing open issue with the same title
+          SEARCH_QUERY=$(jq -n \
+            --arg title "$TITLE" \
+            --arg teamId "$LINEAR_TEAM_ID" \
+            '{query: "query($title: String!, $teamId: String!) { issues(filter: { team: { id: { eq: $teamId } }, title: { eq: $title }, state: { type: { nin: [\"completed\", \"canceled\"] } } }) { nodes { id identifier url } } }", variables: {title: $title, teamId: $teamId}}')
+
+          SEARCH_RESPONSE=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -d "$SEARCH_QUERY" \
+            https://api.linear.app/graphql)
+
+          EXISTING_COUNT=$(echo "$SEARCH_RESPONSE" | jq '.data.issues.nodes | length')
+          if [ "$EXISTING_COUNT" -gt 0 ]; then
+            EXISTING_URL=$(echo "$SEARCH_RESPONSE" | jq -r '.data.issues.nodes[0].url')
+            echo "::notice::Open Linear issue already exists: $EXISTING_URL — skipping creation"
+            exit 0
+          fi
+
           # Escape the audit output for JSON
           BODY=$(echo "$AUDIT_OUTPUT" | jq -Rs .)
 
           # Create issue via Linear GraphQL API
-          QUERY=$(cat <<GRAPHQL
-          mutation {
-            issueCreate(input: {
-              teamId: "${LINEAR_TEAM_ID}"
-              title: "Security Audit: vulnerabilities found in ${REPO_NAME}"
-              description: ${BODY}
-              priority: 1
-            }) {
-              success
-              issue {
-                id
-                identifier
-                url
-              }
-            }
-          }
-          GRAPHQL
-          )
+          CREATE_QUERY=$(jq -n \
+            --arg teamId "$LINEAR_TEAM_ID" \
+            --arg title "$TITLE" \
+            --argjson description "$BODY" \
+            '{query: "mutation($teamId: String!, $title: String!, $description: String!) { issueCreate(input: { teamId: $teamId, title: $title, description: $description, priority: 1 }) { success issue { id identifier url } } }", variables: {teamId: $teamId, title: $title, description: $description}}')
 
           RESPONSE=$(curl -s -X POST \
             -H "Content-Type: application/json" \
             -H "Authorization: ${LINEAR_API_KEY}" \
-            -d "$(jq -n --arg q "$QUERY" '{query: $q}')" \
+            -d "$CREATE_QUERY" \
             https://api.linear.app/graphql)
 
           echo "$RESPONSE" | jq .
