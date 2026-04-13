@@ -41,7 +41,7 @@ release-crates:
 
 ### `require-lockfile`
 
-**Description:** Will require a `Cargo.lock` file to be present and pass `--locked` to cargo
+**Description:** Will require a `Cargo.lock` file to be present and pass `--locked` to cargo. Note: many publishable libraries `.gitignore` `Cargo.lock`; only enable this if the lockfile is committed.
 
 **Type**: `boolean`
 

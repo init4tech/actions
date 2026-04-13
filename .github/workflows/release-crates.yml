@@ -36,8 +36,7 @@ on:
         description: 'SSH private key for fetching private dependencies'
         required: false
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   release_crates:
@@ -46,6 +45,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Setup ssh-agent
         if: ${{ inputs.requires-private-deps == true }}
         uses: webfactory/ssh-agent@v0.9.1
@@ -61,8 +62,16 @@ jobs:
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          PACKAGE: ${{ inputs.package }}
+          LOCKED: ${{ inputs.require-lockfile }}
+          DRY_RUN: ${{ inputs.dry-run }}
         run: |
-          cargo publish \
-            ${{ inputs.package != '' && format('--package {0}', inputs.package) || '' }} \
-            ${{ inputs.require-lockfile && '--locked' || '' }} \
-            ${{ inputs.dry-run && '--dry-run' || '' }}
+          if [ "$DRY_RUN" != "true" ] && [ -z "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "::error::CARGO_REGISTRY_TOKEN is required when dry-run is false"
+            exit 1
+          fi
+          args=()
+          [ -n "$PACKAGE" ] && args+=(--package "$PACKAGE")
+          [ "$LOCKED" = "true" ] && args+=(--locked)
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          cargo publish "${args[@]}"
