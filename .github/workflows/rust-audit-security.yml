@@ -12,10 +12,16 @@ on:
         required: false
         default: '.'
         type: string
+    secrets:
+      linear-api-key:
+        description: 'Linear API key for creating issues'
+        required: false
+      linear-team-id:
+        description: 'Linear team ID to create issues in'
+        required: false
 
 permissions:
   contents: read
-  issues: write
   checks: write
 
 jobs:
@@ -28,11 +34,108 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Generate lockfile if not checked-in to repo
+        working-directory: ${{ inputs.working-directory }}
         run: test -f Cargo.lock || cargo generate-lockfile
 
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Build ignore flags
+        id: ignore-flags
+        if: inputs.ignore-advisories != ''
+        shell: bash
+        run: |
+          FLAGS=""
+          IFS=',' read -ra ADVISORIES <<< "${{ inputs.ignore-advisories }}"
+          for advisory in "${ADVISORIES[@]}"; do
+            FLAGS="$FLAGS --ignore $(echo "$advisory" | xargs)"
+          done
+          echo "flags=$FLAGS" >> "$GITHUB_OUTPUT"
+
       - name: Run security audit
-        uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ github.token }}
-          ignore: ${{ inputs.ignore-advisories }}
-          working-directory: ${{ inputs.working-directory }}
+        id: audit
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        run: |
+          set +e
+          OUTPUT=$(cargo audit ${{ steps.ignore-flags.outputs.flags }} 2>&1)
+          EXIT_CODE=$?
+          set -e
+
+          echo "$OUTPUT"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+          # Save full output for Linear issue creation
+          {
+            echo "audit_output<<AUDIT_EOF"
+            echo "$OUTPUT"
+            echo "AUDIT_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create Linear issues
+        if: steps.audit.outputs.exit_code != '0'
+        shell: bash
+        env:
+          LINEAR_API_KEY: ${{ secrets.linear-api-key }}
+          LINEAR_TEAM_ID: ${{ secrets.linear-team-id }}
+          AUDIT_OUTPUT: ${{ steps.audit.outputs.audit_output }}
+          REPO_NAME: ${{ github.repository }}
+        run: |
+          if [ -z "$LINEAR_API_KEY" ] || [ -z "$LINEAR_TEAM_ID" ]; then
+            echo "::warning::LINEAR_API_KEY or LINEAR_TEAM_ID secret not set, skipping Linear issue creation"
+            exit 0
+          fi
+
+          TITLE="Security Audit: vulnerabilities found in ${REPO_NAME}"
+
+          # Check for existing open issue with the same title
+          SEARCH_QUERY=$(jq -n \
+            --arg title "$TITLE" \
+            --arg teamId "$LINEAR_TEAM_ID" \
+            '{query: "query($title: String!, $teamId: String!) { issues(filter: { team: { id: { eq: $teamId } }, title: { eq: $title }, state: { type: { nin: [\"completed\", \"canceled\"] } } }) { nodes { id identifier url } } }", variables: {title: $title, teamId: $teamId}}')
+
+          SEARCH_RESPONSE=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -d "$SEARCH_QUERY" \
+            https://api.linear.app/graphql)
+
+          EXISTING_COUNT=$(echo "$SEARCH_RESPONSE" | jq '.data.issues.nodes | length')
+          if [ "$EXISTING_COUNT" -gt 0 ]; then
+            EXISTING_URL=$(echo "$SEARCH_RESPONSE" | jq -r '.data.issues.nodes[0].url')
+            echo "::notice::Open Linear issue already exists: $EXISTING_URL — skipping creation"
+            exit 0
+          fi
+
+          # Escape the audit output for JSON
+          BODY=$(echo "$AUDIT_OUTPUT" | jq -Rs .)
+
+          # Create issue via Linear GraphQL API
+          CREATE_QUERY=$(jq -n \
+            --arg teamId "$LINEAR_TEAM_ID" \
+            --arg title "$TITLE" \
+            --argjson description "$BODY" \
+            '{query: "mutation($teamId: String!, $title: String!, $description: String!) { issueCreate(input: { teamId: $teamId, title: $title, description: $description, priority: 1 }) { success issue { id identifier url } } }", variables: {teamId: $teamId, title: $title, description: $description}}')
+
+          RESPONSE=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -d "$CREATE_QUERY" \
+            https://api.linear.app/graphql)
+
+          echo "$RESPONSE" | jq .
+
+          SUCCESS=$(echo "$RESPONSE" | jq -r '.data.issueCreate.success')
+          if [ "$SUCCESS" = "true" ]; then
+            ISSUE_URL=$(echo "$RESPONSE" | jq -r '.data.issueCreate.issue.url')
+            echo "::notice::Linear issue created: $ISSUE_URL"
+          else
+            echo "::error::Failed to create Linear issue"
+            echo "$RESPONSE"
+          fi
+
+      - name: Fail if vulnerabilities found
+        if: steps.audit.outputs.exit_code != '0'
+        run: |
+          echo "::error::Security vulnerabilities found. See audit output above."
+          exit 1
