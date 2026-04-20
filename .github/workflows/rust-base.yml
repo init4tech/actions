@@ -147,6 +147,16 @@ jobs:
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: cargo clippy --all-targets --all-features --workspace --profile ${{ inputs.rust-profile }} -- -D warnings
+      - if: ${{ inputs.require-lockfile == true }}
+        name: Clippy check (no-default-features)
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo clippy --lib --bins --no-default-features --workspace --locked --profile ${{ inputs.rust-profile }} -- -D warnings
+      - if: ${{ inputs.require-lockfile == false }}
+        name: Clippy check (no-default-features)
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: cargo clippy --lib --bins --no-default-features --workspace --profile ${{ inputs.rust-profile }} -- -D warnings
 
   dylint:
     name: Dylint
