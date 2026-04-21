@@ -83,7 +83,7 @@ jobs:
             ${{ secrets.SSH_PRIVATE_KEY_2 }}
             ${{ secrets.SSH_PRIVATE_KEY_3 }}
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Setup Docker Metadata
         id: meta
         uses: docker/metadata-action@v6
