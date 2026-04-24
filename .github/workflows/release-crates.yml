@@ -1,24 +1,77 @@
 name: Release Crates
 on:
   workflow_call:
+    inputs:
+      package:
+        description: 'Specific package to publish (for workspaces). When empty, publishes the root crate.'
+        required: false
+        default: ''
+        type: string
+      dry-run:
+        description: 'Run cargo publish with --dry-run instead of actually publishing'
+        required: false
+        default: false
+        type: boolean
+      requires-private-deps:
+        description: 'Requires private dependencies to be fetched, sets up ssh-agent'
+        required: false
+        default: false
+        type: boolean
+      require-lockfile:
+        description: 'Require a Cargo.lock file to be present; passes --locked to cargo'
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      CARGO_REGISTRY_TOKEN:
+        description: 'The crates.io API token used to publish'
+        required: false
+      SSH_PRIVATE_KEY:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
+      SSH_PRIVATE_KEY_2:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
+      SSH_PRIVATE_KEY_3:
+        description: 'SSH private key for fetching private dependencies'
+        required: false
 
-permissions:
-    contents: write    
+permissions: {}
 
 jobs:
-    release_crates:
-        runs-on: ubuntu-24.04-arm
-        steps:
-        - uses: actions/checkout@v6
-        - name: Install Rust toolchain
-          uses: dtolnay/rust-toolchain@stable
-        - uses: Swatinem/rust-cache@v2  
-        - name: Cargo Build Release
-          run: cargo build --release
-        - name: Cargo Package
-          run: cargo package --allow-dirty
-        - name: Publish to Crates.io
-          run: cargo publish
-          env:
-            CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-                
+  release_crates:
+    runs-on:
+      group: init4-runners
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Setup ssh-agent
+        if: ${{ inputs.requires-private-deps == true }}
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
+            ${{ secrets.SSH_PRIVATE_KEY_2 }}
+            ${{ secrets.SSH_PRIVATE_KEY_3 }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Publish to crates.io
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          PACKAGE: ${{ inputs.package }}
+          LOCKED: ${{ inputs.require-lockfile }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          if [ "$DRY_RUN" != "true" ] && [ -z "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "::error::CARGO_REGISTRY_TOKEN is required when dry-run is false"
+            exit 1
+          fi
+          args=()
+          [ -n "$PACKAGE" ] && args+=(--package "$PACKAGE")
+          [ "$LOCKED" = "true" ] && args+=(--locked)
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          cargo publish "${args[@]}"

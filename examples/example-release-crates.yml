@@ -1,18 +1,29 @@
-name: add binaries to release
+name: Release crate to crates.io
 on:
   push:
     tags:
-    - 'v*'
+      - 'v*'
     # this will trigger anytime a tag is pushed matching the regex v* (v1.0.0, v2.0.0, etc.)
 
 permissions:
   contents: write
 
-# this job will compile your rust project and publish the to crates.io
-# the job will run the following steps:
-#   - cargo build --release
-#   - cargo package
-#   - cargo publish
+# this job will publish your rust crate to crates.io via `cargo publish`.
 jobs:
-  upload-binaries:
+  release-crates:
     uses: init4tech/actions/.github/workflows/release-crates.yml@main
+    with:
+      # Uncomment to publish a specific workspace package
+      # package: my-crate
+      # Uncomment to require a committed Cargo.lock
+      # require-lockfile: true
+      # Uncomment when the crate depends on private git repositories
+      # requires-private-deps: true
+      # Uncomment to exercise the workflow without publishing
+      # dry-run: true
+    secrets:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      # Only needed when requires-private-deps is true
+      # SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      # SSH_PRIVATE_KEY_2: ${{ secrets.SSH_PRIVATE_KEY_2 }}
+      # SSH_PRIVATE_KEY_3: ${{ secrets.SSH_PRIVATE_KEY_3 }}
