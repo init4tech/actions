@@ -1,0 +1,194 @@
+# init4tech/actions/.github/workflows/qwenreview.yml
+#
+# Reusable workflow that requests a Qwen-authored PR review.
+# Consumer repos call this via:
+#   uses: init4tech/actions/.github/workflows/qwenreview.yml@main
+name: qwenreview
+
+on:
+  workflow_call:
+    inputs:
+      service_url:
+        description: "Base URL of the qwenreview service"
+        type: string
+        required: false
+        default: "https://qwenreview.<DOMAIN>"
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+  issues: read
+
+jobs:
+  eligibility:
+    name: Eligibility check
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.gate.outputs.should_run }}
+      pr_number: ${{ steps.gate.outputs.pr_number }}
+    steps:
+      - id: gate
+        uses: actions/github-script@v7
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        with:
+          script: |
+            const ev = process.env.EVENT_NAME;
+            const allowed = ["OWNER", "MEMBER", "COLLABORATOR"];
+            let prNumber = null;
+            let shouldRun = false;
+            if (ev === "pull_request") {
+              const pr = context.payload.pull_request;
+              const isBot = (pr.user.login || "").endsWith("[bot]");
+              if (!pr.draft && !isBot &&
+                  allowed.includes(pr.author_association)) {
+                shouldRun = true;
+                prNumber = pr.number;
+              }
+            } else if (ev === "issue_comment") {
+              const issue = context.payload.issue;
+              const comment = context.payload.comment;
+              if (issue.pull_request &&
+                  comment.body.trim() === "/qwenreview" &&
+                  allowed.includes(comment.author_association)) {
+                shouldRun = true;
+                prNumber = issue.number;
+              }
+            }
+            core.setOutput("should_run", shouldRun ? "true" : "false");
+            core.setOutput("pr_number", prNumber !== null ? String(prNumber) : "");
+
+  review:
+    name: Run Qwen review
+    needs: eligibility
+    if: needs.eligibility.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/pull/${{ needs.eligibility.outputs.pr_number }}/merge
+
+      - id: collect
+        name: Collect diff and SHAs
+        env:
+          PR_NUMBER: ${{ needs.eligibility.outputs.pr_number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BASE_SHA=$(jq -r .pull_request.base.sha < "$GITHUB_EVENT_PATH" 2>/dev/null \
+            || gh pr view "$PR_NUMBER" --json baseRefOid -q .baseRefOid)
+          HEAD_SHA=$(jq -r .pull_request.head.sha < "$GITHUB_EVENT_PATH" 2>/dev/null \
+            || gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)
+          BASE_REF=$(jq -r .pull_request.base.ref < "$GITHUB_EVENT_PATH" 2>/dev/null \
+            || gh pr view "$PR_NUMBER" --json baseRefName -q .baseRefName)
+
+          git fetch --no-tags origin "$BASE_REF" "$HEAD_SHA"
+          git diff --unified=3 "$BASE_SHA"..."$HEAD_SHA" > diff.patch
+
+          echo "base_sha=$BASE_SHA"   >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA"   >> "$GITHUB_OUTPUT"
+          echo "diff_path=$PWD/diff.patch" >> "$GITHUB_OUTPUT"
+
+      - id: app_token
+        name: Mint GitHub App installation token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.QWENREVIEW_APP_ID }}
+          private-key: ${{ secrets.QWENREVIEW_APP_PRIVATE_KEY }}
+
+      - id: submit
+        name: Submit review job to qwenreview service
+        env:
+          PR_NUMBER: ${{ needs.eligibility.outputs.pr_number }}
+          BASE_SHA: ${{ steps.collect.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.collect.outputs.head_sha }}
+          DIFF_PATH: ${{ steps.collect.outputs.diff_path }}
+          SERVICE_URL: ${{ inputs.service_url }}
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+        run: |
+          set -euo pipefail
+          OIDC=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=qwenreview.swanbots" | jq -r .value)
+
+          BODY=$(jq -n --arg repo "$GITHUB_REPOSITORY" \
+                       --argjson pr "$PR_NUMBER" \
+                       --arg base "$BASE_SHA" --arg head "$HEAD_SHA" \
+                       --rawfile diff "$DIFF_PATH" \
+                       '{repo:$repo, pr_number:$pr, base_sha:$base,
+                         head_sha:$head, diff:$diff, files:[]}')
+
+          RESP=$(curl -sS -o resp.json -w "%{http_code}" \
+            -X POST "$SERVICE_URL/reviews" \
+            -H "Authorization: Bearer $OIDC" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+          if [ "$RESP" = "400" ] && [ "$(jq -r '.error // empty' resp.json)" = "diff_too_large" ]; then
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+              -f body="qwenreview: PR is too large (>200 KB diff) for automated review."
+            echo "Posted diff_too_large notice to PR #$PR_NUMBER"
+            exit 0
+          fi
+          if [ "$RESP" != "202" ]; then
+            echo "service rejected submission: HTTP $RESP"
+            cat resp.json
+            exit 1
+          fi
+          ID=$(jq -r .id resp.json)
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
+      - id: poll
+        name: Poll for completion (10-min cap)
+        if: steps.submit.outputs.id != ''
+        env:
+          ID: ${{ steps.submit.outputs.id }}
+          SERVICE_URL: ${{ inputs.service_url }}
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+        run: |
+          set -euo pipefail
+          DEADLINE=$(( $(date +%s) + 600 ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            OIDC=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=qwenreview.swanbots" | jq -r .value)
+            CODE=$(curl -sS -o status.json -w "%{http_code}" \
+              -H "Authorization: Bearer $OIDC" \
+              "$SERVICE_URL/reviews/$ID")
+            if [ "$CODE" != "200" ]; then
+              echo "poll got HTTP $CODE"; cat status.json; exit 1
+            fi
+            STATUS=$(jq -r .status status.json)
+            case "$STATUS" in
+              completed) echo "completed"; exit 0 ;;
+              failed|timeout)
+                echo "review terminated: $STATUS"
+                jq -r .error status.json
+                exit 1 ;;
+              queued|running) sleep 5 ;;
+              *) echo "unexpected status: $STATUS"; exit 1 ;;
+            esac
+          done
+          echo "10-min poll cap reached"
+          exit 1
+
+      - name: Post review to PR
+        if: steps.submit.outputs.id != ''
+        env:
+          PR_NUMBER: ${{ needs.eligibility.outputs.pr_number }}
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          SUMMARY=$(jq -r .summary status.json)
+          if [ "$EVENT_NAME" = "issue_comment" ]; then
+            SUMMARY=$(printf "_Re-run requested by @%s_\n\n%s" "$ACTOR" "$SUMMARY")
+          fi
+          COMMENTS=$(jq '[.comments[] | {path, line, side, body}]' status.json)
+          BODY=$(jq -n --arg b "$SUMMARY" --argjson c "$COMMENTS" \
+            '{event:"COMMENT", body:$b, comments:$c}')
+          gh api -X POST "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" \
+            --input - <<< "$BODY"
