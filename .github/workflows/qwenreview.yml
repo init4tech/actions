@@ -7,12 +7,16 @@ name: qwenreview
 
 on:
   workflow_call:
-    inputs:
-      service_url:
-        description: "Base URL of the qwenreview service"
-        type: string
-        required: false
-        default: "https://qwenreview.<DOMAIN>"
+    secrets:
+      QWENREVIEW_SERVICE_URL:
+        description: "Base URL of the qwenreview service (e.g. https://qwenreview.example.com)"
+        required: true
+      QWENREVIEW_APP_ID:
+        description: "qwenreview GitHub App ID"
+        required: true
+      QWENREVIEW_APP_PRIVATE_KEY:
+        description: "qwenreview GitHub App private key (PEM)"
+        required: true
 
 permissions:
   contents: read
@@ -105,7 +109,7 @@ jobs:
           BASE_SHA: ${{ steps.collect.outputs.base_sha }}
           HEAD_SHA: ${{ steps.collect.outputs.head_sha }}
           DIFF_PATH: ${{ steps.collect.outputs.diff_path }}
-          SERVICE_URL: ${{ inputs.service_url }}
+          SERVICE_URL: ${{ secrets.QWENREVIEW_SERVICE_URL }}
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
           ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
           ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
@@ -145,7 +149,7 @@ jobs:
         if: steps.submit.outputs.id != ''
         env:
           ID: ${{ steps.submit.outputs.id }}
-          SERVICE_URL: ${{ inputs.service_url }}
+          SERVICE_URL: ${{ secrets.QWENREVIEW_SERVICE_URL }}
           ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
           ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
         run: |
