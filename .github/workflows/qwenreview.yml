@@ -81,15 +81,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          BASE_SHA=$(jq -r .pull_request.base.sha < "$GITHUB_EVENT_PATH" 2>/dev/null \
-            || gh pr view "$PR_NUMBER" --json baseRefOid -q .baseRefOid)
-          HEAD_SHA=$(jq -r .pull_request.head.sha < "$GITHUB_EVENT_PATH" 2>/dev/null \
-            || gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)
-          BASE_REF=$(jq -r .pull_request.base.ref < "$GITHUB_EVENT_PATH" 2>/dev/null \
-            || gh pr view "$PR_NUMBER" --json baseRefName -q .baseRefName)
+          BASE_SHA=$(jq -er .pull_request.base.sha < "$GITHUB_EVENT_PATH" 2>/dev/null) \
+            || BASE_SHA=$(gh pr view "$PR_NUMBER" --json baseRefOid -q .baseRefOid)
+          HEAD_SHA=$(jq -er .pull_request.head.sha < "$GITHUB_EVENT_PATH" 2>/dev/null) \
+            || HEAD_SHA=$(gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid)
+          BASE_REF=$(jq -er .pull_request.base.ref < "$GITHUB_EVENT_PATH" 2>/dev/null) \
+            || BASE_REF=$(gh pr view "$PR_NUMBER" --json baseRefName -q .baseRefName)
 
           git fetch --no-tags origin "$BASE_REF" "$HEAD_SHA"
-          git diff --unified=3 "$BASE_SHA"..."$HEAD_SHA" > diff.patch
+          # Exclude planning artifacts and generated lockfiles from the diff
+          # sent to the reviewer. These are either non-code (specs/plans) or
+          # machine-generated, and consume budget the model should spend on
+          # actual source changes.
+          git diff --unified=3 "$BASE_SHA"..."$HEAD_SHA" -- \
+            ':(exclude)docs/superpowers/**' \
+            ':(exclude)*.lock' \
+            ':(exclude)go.sum' \
+            ':(exclude)package-lock.json' \
+            ':(exclude)pnpm-lock.yaml' \
+            > diff.patch
 
           echo "base_sha=$BASE_SHA"   >> "$GITHUB_OUTPUT"
           echo "head_sha=$HEAD_SHA"   >> "$GITHUB_OUTPUT"
