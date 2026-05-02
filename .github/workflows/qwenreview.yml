@@ -118,18 +118,18 @@ jobs:
           OIDC=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=qwenreview.swanbots" | jq -r .value)
 
-          BODY=$(jq -n --arg repo "$GITHUB_REPOSITORY" \
-                       --argjson pr "$PR_NUMBER" \
-                       --arg base "$BASE_SHA" --arg head "$HEAD_SHA" \
-                       --rawfile diff "$DIFF_PATH" \
-                       '{repo:$repo, pr_number:$pr, base_sha:$base,
-                         head_sha:$head, diff:$diff, files:[]}')
+          jq -n --arg repo "$GITHUB_REPOSITORY" \
+                --argjson pr "$PR_NUMBER" \
+                --arg base "$BASE_SHA" --arg head "$HEAD_SHA" \
+                --rawfile diff "$DIFF_PATH" \
+                '{repo:$repo, pr_number:$pr, base_sha:$base,
+                  head_sha:$head, diff:$diff, files:[]}' > body.json
 
           RESP=$(curl -sS -o resp.json -w "%{http_code}" \
             -X POST "$SERVICE_URL/reviews" \
             -H "Authorization: Bearer $OIDC" \
             -H "Content-Type: application/json" \
-            -d "$BODY")
+            --data-binary @body.json)
           if [ "$RESP" = "400" ] && [ "$(jq -r '.error // empty' resp.json)" = "diff_too_large" ]; then
             gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
               -f body="qwenreview: PR is too large (>200 KB diff) for automated review."
