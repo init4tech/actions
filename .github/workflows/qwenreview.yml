@@ -33,7 +33,7 @@ jobs:
       pr_number: ${{ steps.gate.outputs.pr_number }}
     steps:
       - id: gate
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           EVENT_NAME: ${{ github.event_name }}
         with:
