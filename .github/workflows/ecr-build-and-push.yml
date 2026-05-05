@@ -1,4 +1,7 @@
-# Publishes the Docker image.
+# Builds and pushes a multi-arch (linux/amd64 + linux/arm64) Docker image to
+# Amazon ECR. Each arch is built natively on a matching GitHub-hosted runner
+# and pushed by digest; a final job assembles the manifest list under the
+# real tags (semver, branch, sha, latest).
 
 name: Docker ECR Build and Push
 
@@ -12,7 +15,7 @@ on:
       environment:
         description: 'Environment to deploy to'
         required: true
-        type: string  
+        type: string
       requires-private-deps:
         description: 'Requires private dependencies to be fetched, sets up ssh-agent'
         required: false
@@ -23,7 +26,7 @@ on:
         required: false
         default: 'Dockerfile'
         type: string
-    secrets: 
+    secrets:
       aws-ecr-repository:
         description: 'ECR repository to push to'
         required: true
@@ -33,7 +36,7 @@ on:
       SSH_PRIVATE_KEY:
         description: 'SSH private key for fetching private dependencies'
         required: false
-      SSH_PRIVATE_KEY_2: 
+      SSH_PRIVATE_KEY_2:
         description: 'SSH private key for fetching private dependencies'
         required: false
       SSH_PRIVATE_KEY_3:
@@ -42,29 +45,28 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY }}
 
 jobs:
   build:
-    name: build and push
-    runs-on: 
-      group: init4-runners
+    name: build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
     environment: ${{ inputs.environment }}
     permissions:
       packages: write
       contents: read
       id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux/amd64
+            platform-pair: linux-amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            platform-pair: linux-arm64
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Cache Docker layers
-        uses: actions/cache@v5
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -74,17 +76,16 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
       - name: Setup ssh-agent
-        id: ssh-agent
         if: ${{ inputs.requires-private-deps == true }}
         uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: |
-            ${{ secrets.SSH_PRIVATE_KEY }}            
+            ${{ secrets.SSH_PRIVATE_KEY }}
             ${{ secrets.SSH_PRIVATE_KEY_2 }}
             ${{ secrets.SSH_PRIVATE_KEY_3 }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-      - name: Setup Docker Metadata
+      - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
@@ -94,40 +95,95 @@ jobs:
             type=raw,value=latest,enable=true
             type=semver,pattern={{version}}
             type=sha,format=short
-      - name: Build and push
+      - name: Build and push by digest
         if: ${{ inputs.requires-private-deps == false }}
+        id: build
         uses: docker/build-push-action@v7
         with:
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/arm64
           context: .
           file: ${{ inputs.dockerfile-path }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-        env: 
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ secrets.aws-ecr-repository }}/${{ inputs.rust-binary-name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=ecr-${{ inputs.rust-binary-name }}-${{ matrix.platform-pair }}
+          cache-to: type=gha,mode=max,scope=ecr-${{ inputs.rust-binary-name }}-${{ matrix.platform-pair }}
+        env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-      - name: Build and push
+      - name: Build and push by digest (with ssh)
         if: ${{ inputs.requires-private-deps == true }}
+        id: build-ssh
         uses: docker/build-push-action@v7
         with:
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/arm64
           context: .
           file: ${{ inputs.dockerfile-path }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-          ssh: | 
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ secrets.aws-ecr-repository }}/${{ inputs.rust-binary-name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=ecr-${{ inputs.rust-binary-name }}-${{ matrix.platform-pair }}
+          cache-to: type=gha,mode=max,scope=ecr-${{ inputs.rust-binary-name }}-${{ matrix.platform-pair }}
+          ssh: |
             default=${{ env.SSH_AUTH_SOCK }}
-        env: 
+        env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-              - # Temp fix
-        # https://github.com/docker/build-push-action/issues/252
-        # https://github.com/moby/buildkit/issues/1896
-      - name: Move cache
+      - name: Export digest
         run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache          
+          digest="${{ steps.build.outputs.digest || steps.build-ssh.outputs.digest }}"
+          if [ -z "$digest" ]; then
+            echo "::error::no digest produced by build step"
+            exit 1
+          fi
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${digest#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@v6
+        with:
+          name: ecr-digests-${{ matrix.platform-pair }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: merge manifest
+    runs-on: ubuntu-latest
+    needs: build
+    environment: ${{ inputs.environment }}
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v7
+        with:
+          path: /tmp/digests
+          pattern: ecr-digests-*
+          merge-multiple: true
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.aws-ecr-deployer-role-arn }}
+          aws-region: us-east-1
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ secrets.aws-ecr-repository }}/${{ inputs.rust-binary-name }}
+          tags: |
+            type=ref,event=branch
+            type=raw,value=latest,enable=true
+            type=semver,pattern={{version}}
+            type=sha,format=short
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ secrets.aws-ecr-repository }}/${{ inputs.rust-binary-name }}@sha256:%s ' *)
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect \
+            ${{ secrets.aws-ecr-repository }}/${{ inputs.rust-binary-name }}:${{ steps.meta.outputs.version }}
