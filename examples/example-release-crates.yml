@@ -5,8 +5,7 @@ on:
       - 'v*'
     # this will trigger anytime a tag is pushed matching the regex v* (v1.0.0, v2.0.0, etc.)
 
-permissions:
-  contents: write
+permissions: {}
 
 # this job will publish your rust crate to crates.io via `cargo publish`.
 jobs:
