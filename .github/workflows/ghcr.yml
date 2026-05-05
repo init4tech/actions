@@ -1,44 +1,104 @@
-#
+# Builds and pushes a multi-arch (linux/amd64 + linux/arm64) Docker image to
+# GHCR. Each arch is built natively on a matching GitHub-hosted runner and
+# pushed by digest; a final job assembles the manifest list under the real
+# tags (semver, branch, pr, sha, latest).
+
 name: Create and publish a Docker image
 
-# Configures this workflow to be called by other workflows using the `workflow_call` trigger.
 on:
   workflow_call:
 
-# Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-# There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
 jobs:
-  build-and-push-image:
-    runs-on: 
-      group: init4-runners
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
-    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+  build:
+    name: build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
       attestations: write
       id-token: write
-      #
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux/amd64
+            platform-pair: linux-amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            platform-pair: linux-arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      # Uses the `docker/login-action` action to log in to the Container registry registry using the account and password that will publish the packages. Once published, the packages are scoped to the account defined here.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
       - name: Log in to the Container registry
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # This step uses [docker/metadata-action](https://github.com/docker/metadata-action#about) to extract tags and labels that will be applied to the specified image. The `id` "meta" allows the output of this step to be referenced in a subsequent step. The `images` value provides the base name for the tags and labels.
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=ghcr-${{ matrix.platform-pair }}
+          cache-to: type=gha,mode=max,scope=ghcr-${{ matrix.platform-pair }}
+      - name: Export digest
+        run: |
+          digest="${{ steps.build.outputs.digest }}"
+          if [ -z "$digest" ]; then
+            echo "::error::no digest produced by build step"
+            exit 1
+          fi
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${digest#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@v6
+        with:
+          name: ghcr-digests-${{ matrix.platform-pair }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: merge manifest
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v7
+        with:
+          path: /tmp/digests
+          pattern: ghcr-digests-*
+          merge-multiple: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
@@ -50,23 +110,27 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
             type=raw,value=latest,enable=true
-      # This step uses the `docker/build-push-action` action to build the image, based on your repository's `Dockerfile`. If the build succeeds, it pushes the image to GitHub Packages.
-      # It uses the `context` parameter to define the build's context as the set of files located in the specified path. For more information, see [Usage](https://github.com/docker/build-push-action#usage) in the README of the `docker/build-push-action` repository.
-      # It uses the `tags` and `labels` parameters to tag and label the image with the output from the "meta" step.
-      - name: Build and push Docker image
-        id: push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-      
-      # This step generates an artifact attestation for the image, which is an unforgeable statement about where and how it was built. It increases supply chain security for people who consume the image. For more information, see [Using artifact attestations to establish provenance for builds](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
+      - name: Create manifest list and push
+        id: manifest
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+          # Resolve the manifest digest of the freshly pushed multi-arch image
+          # (needed for build-provenance attestation).
+          version_tag="${{ steps.meta.outputs.version }}"
+          manifest_digest=$(docker buildx imagetools inspect \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${version_tag}" \
+            --format '{{ json .Manifest }}' | jq -r '.digest')
+          echo "digest=${manifest_digest}" >> "$GITHUB_OUTPUT"
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v4
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.manifest.outputs.digest }}
           push-to-registry: true
-      
