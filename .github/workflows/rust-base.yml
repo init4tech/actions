@@ -225,7 +225,11 @@ jobs:
           DYLINT_LIBRARY_PATH: ${{ github.workspace }}/.lints/instrument-fields/target/debug
           RUSTFLAGS: "-D bare_instrument_fields"
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: cargo +${{ env.NIGHTLY }} dylint --all --no-deps --workspace
+        # The pinned nightly is an implementation detail of the lint tooling, not a
+        # build target, so the inner `cargo check` must not enforce the consuming
+        # workspace's `rust-version`. MSRV is enforced by the Clippy/Test jobs, which
+        # run on the real toolchain.
+        run: cargo +${{ env.NIGHTLY }} dylint --all --no-deps --workspace -- --ignore-rust-version
 
   docs:
     name: Docs
