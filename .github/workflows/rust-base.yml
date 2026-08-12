@@ -192,12 +192,12 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         uses: taiki-e/cache-cargo-install-action@v3
         with:
-          tool: cargo-dylint@5.0.0
+          tool: cargo-dylint@6.0.3
       - name: Install dylint-link
         if: steps.check.outputs.skip != 'true'
         uses: taiki-e/cache-cargo-install-action@v3
         with:
-          tool: dylint-link@5.0.0
+          tool: dylint-link@6.0.3
       - name: Checkout lints
         if: steps.check.outputs.skip != 'true'
         uses: actions/checkout@v6
