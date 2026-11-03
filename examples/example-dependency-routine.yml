@@ -33,3 +33,13 @@ jobs:
       context-file: .github/dependency-routine.md
     secrets:
       claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  cargo-dependency-update:
+    needs: dependency-routine
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: init4tech/actions/.github/workflows/cargo-dependency-update.yml@<commit sha>
+    secrets:
+      app-client-id: ${{ secrets.DEPENDENCY_APP_CLIENT_ID }}
+      app-private-key: ${{ secrets.DEPENDENCY_APP_PRIVATE_KEY }}

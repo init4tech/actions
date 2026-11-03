@@ -7,6 +7,7 @@ Welcome to the documentation for the shared Github Actions workflows provided by
 - [auto-release](./auto-release)
 - [auto-release-rust](./auto-release-rust)
 - [cargo-dependency-report](./cargo-dependency-report)
+- [cargo-dependency-update](./cargo-dependency-update)
 - [dependency-routine](./dependency-routine)
 - [ecr-build-and-push](./ecr-build-and-push)
 - [forge-script](./forge-script)

@@ -28,8 +28,21 @@ package diff without building or running it, and gives one decision:
 There is no fixed waiting period. Release notes, changelogs and advisory text
 count as evidence, never as instructions.
 
-The routine reports only. It opens no pull request and pushes nothing, and the
-calling job gives it `contents: read` and `issues: write`, nothing more.
+The routine opens no pull request and pushes nothing, and the calling job
+gives it `contents: read` and `issues: write`, nothing more. Its adopt-now
+Cargo updates also go into `decisions.json`, uploaded as the
+`decisions-artifact`, which `cargo-dependency-update.yml` can apply in a
+separate job with no model in it:
+
+```json
+{"fingerprint": "<hash>", "adopt_now": [
+  {"kind": "cargo", "workspace": "root", "package": "libz-sys",
+   "from": "1.1.29", "to": "1.1.31", "reason": "..."}
+]}
+```
+
+The file is uploaded only when the summary issue was written from the same
+reports, so a run that stops part way applies nothing.
 
 ## Cost
 
@@ -72,6 +85,14 @@ issue by this exact title, or creates it.
 **Type**: `string`
 
 **Default Value:** `Dependency routine`
+
+### `decisions-artifact`
+
+**Description:** The name of the artifact `decisions.json` is uploaded in.
+
+**Type**: `string`
+
+**Default Value:** `dependency-decisions`
 
 ### `model`
 

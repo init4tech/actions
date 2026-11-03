@@ -3,8 +3,10 @@ name: 'Dependency Routine'
 # uploaded (the artifacts matching `report-pattern`, from workflow-audit.yml,
 # image-scan.yml, cargo-dependency-report.yml and the like), and keep one
 # summary issue in the calling repository up to date with a decision for each
-# finding and each available update. It reports only: it opens no pull request
-# and pushes nothing, and the calling job grants it no write access to code.
+# finding and each available update. It opens no pull request and pushes
+# nothing, and the calling job grants it no write access to code. Its adopt-now
+# Cargo updates go into a `decisions.json` artifact, which a separate job with
+# no model in it (cargo-dependency-update.yml) can apply.
 #
 # Claude runs only when the reports changed since the decisions in the summary
 # issue were written. Each report's `summary.txt` is hashed, and the issue
@@ -33,6 +35,11 @@ on:
         description: 'Claude model'
         required: false
         default: 'claude-sonnet-5-5'
+        type: string
+      decisions-artifact:
+        description: 'Name of the uploaded artifact holding decisions.json, the adopt-now Cargo updates'
+        required: false
+        default: 'dependency-decisions'
         type: string
       force:
         description: 'Run Claude even when the reports have not changed'
@@ -123,10 +130,14 @@ jobs:
             TITLE: ${{ inputs.issue-title }}
             FINGERPRINT: ${{ steps.gate.outputs.fingerprint }}
             BODY: ${{ runner.temp }}/issue-body.md
+            DECISIONS: ${{ runner.temp }}/decisions/decisions.json
 
             You keep this repository's dependencies patched without taking
-            a compromised release. You report only: you open no pull request,
-            push nothing and change no file in the repository.
+            a compromised release. You open no pull request, push nothing and
+            change no file in the repository. A separate job, with no model
+            in it, applies the Cargo updates you list as adopt now in
+            DECISIONS; everything else you decide stays in the issue for a
+            person.
 
             Read CONTEXT first; it says which parts of this repository face
             the internet or tenants, hold credentials, or form an isolation
@@ -193,6 +204,23 @@ jobs:
             code at build or install time, or its publisher changed; group
             the rest under one line each.
 
+            Write DECISIONS with the Write tool, even when it lists nothing:
+
+            ```json
+            {"fingerprint": "FINGERPRINT", "adopt_now": [
+              {"kind": "cargo", "workspace": "root", "package": "libz-sys",
+               "from": "1.1.29", "to": "1.1.31",
+               "reason": "RUSTSEC-2026-0418 reaches ...; diff reviewed: ..."}
+            ]}
+            ```
+
+            List only adopt-now decisions for a crate in a Cargo lockfile,
+            one entry per crate and workspace, with `workspace` exactly as
+            the cargo report names it, `from` the locked version and `to` a
+            version you reviewed. `reason` is one or two sentences of your
+            own evidence; quote no upstream text in it. An image, an action
+            or any other adopt-now item goes in the issue only.
+
             Write the whole issue body to BODY with the Write tool. Its first
             line must be exactly
             `<!-- dependency-routine-fingerprint: FINGERPRINT -->`.
@@ -208,6 +236,38 @@ jobs:
           claude_args: |
             --model ${{ inputs.model }}
             --allowedTools "Read,Grep,Glob,Write,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue create:*),Bash(gh release view:*),Bash(cargo tree:*),Bash(cargo metadata:*),Bash(curl -fsSL -A init4-dependency-routine https://crates.io/api/v1/:*),Bash(curl -fsSL -A init4-dependency-routine https://static.crates.io/crates/:*),Bash(curl -fsSL -A init4-dependency-routine https://registry.npmjs.org/:*),Bash(curl -fsSL -A init4-dependency-routine https://proxy.golang.org/:*),Bash(curl -fsSL -A init4-dependency-routine https://api.osv.dev/:*),Bash(mkdir:*),Bash(tar -xzf:*),Bash(diff:*)"
+
+      # Uploaded only when the issue was written from this run's reports, so a
+      # run that stops part way applies nothing.
+      - name: Check the decisions match the issue
+        id: decided
+        if: steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ inputs.issue-title }}
+          FINGERPRINT: ${{ steps.gate.outputs.fingerprint }}
+          DECISIONS: ${{ runner.temp }}/decisions/decisions.json
+        run: |
+          issue=$(gh issue list --state open --limit 100 --json number,title |
+            jq -r --arg title "$TITLE" 'map(select(.title == $title)) | .[0].number // empty')
+          written=""
+          if [ -n "$issue" ]; then
+            written=$(gh issue view "$issue" --json body --jq .body |
+              sed -n 's/.*<!-- dependency-routine-fingerprint: \([0-9a-f]*\) -->.*/\1/p' | head -1)
+          fi
+          if [ "$written" = "$FINGERPRINT" ] && [ -f "$DECISIONS" ] &&
+            jq -e --arg fingerprint "$FINGERPRINT" '.fingerprint == $fingerprint' "$DECISIONS" >/dev/null; then
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::The decisions file is missing or does not match the issue; nothing will be applied."
+          fi
+
+      - if: steps.decided.outputs.upload == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.decisions-artifact }}
+          path: ${{ runner.temp }}/decisions/decisions.json
+          retention-days: 14
 
       - if: failure() && steps.gate.outputs.run == 'true'
         name: Report an unfinished run
