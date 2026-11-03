@@ -1,0 +1,207 @@
+name: 'Image Scan'
+# Scans container images with osv-scanner and uploads a dependency report:
+# `summary.txt`, one stable line per image and package with the ids of its
+# vulnerabilities at or above `min-severity` that a fixed version resolves,
+# and one JSON report per image with every finding. The calling repository
+# supplies the images as a command that prints one reference per line, ideally
+# pinned by digest. On a pull request the job scans only the references the
+# command prints at the head and not at the base, the images the PR starts
+# using. The job reports and never fails on a finding.
+on:
+  workflow_call:
+    inputs:
+      list-command:
+        description: 'Shell command, run at the repository root, that prints one image reference per line'
+        required: true
+        type: string
+      runs-on:
+        description: 'Runner, as JSON: a label string such as "ubuntu-latest", or an object such as {"group": "init4-runners"}'
+        required: false
+        default: '"ubuntu-latest"'
+        type: string
+      artifact-name:
+        description: 'Name of the uploaded report artifact'
+        required: false
+        default: 'dependency-report-images'
+        type: string
+      min-severity:
+        description: 'Lowest CVSS score a vulnerability group needs to appear in summary.txt'
+        required: false
+        default: '7.0'
+        type: string
+      fixed-only:
+        description: 'Keep in summary.txt only the vulnerabilities whose package has a fixed version'
+        required: false
+        default: true
+        type: boolean
+      osv-scanner-version:
+        description: 'osv-scanner version to install'
+        required: false
+        default: '2.7.0'
+        type: string
+      timeout-minutes:
+        description: 'Job timeout'
+        required: false
+        default: 60
+        type: number
+    secrets:
+      dockerhub-username:
+        description: 'Docker Hub user, to pull under its rate limit instead of the anonymous one'
+        required: false
+      dockerhub-token:
+        description: 'Read-only Docker Hub access token for dockerhub-username'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  image-scan:
+    name: Image scan
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .image-scan-base
+          persist-credentials: false
+
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: osv-scanner@${{ inputs.osv-scanner-version }}
+
+      - name: Log in to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.dockerhub-username }}
+          DOCKERHUB_TOKEN: ${{ secrets.dockerhub-token }}
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            printf '%s' "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+          else
+            echo "No Docker Hub credentials; pulling anonymously."
+          fi
+
+      # A base where the command fails, such as one without the list it reads,
+      # counts as listing nothing.
+      - name: Choose the images to scan
+        env:
+          EVENT: ${{ github.event_name }}
+          LIST_COMMAND: ${{ inputs.list-command }}
+          WORK: ${{ runner.temp }}/image-scan
+        run: |
+          mkdir -p "$WORK"
+          bash -c "$LIST_COMMAND" | grep -v '^$' | sort -u > "$WORK/head.txt"
+          if [ "$EVENT" = pull_request ]; then
+            (cd .image-scan-base && bash -c "$LIST_COMMAND" 2>/dev/null || true) |
+              grep -v '^$' | sort -u > "$WORK/base.txt" || true
+            comm -23 "$WORK/head.txt" "$WORK/base.txt" > "$WORK/scan.txt"
+          else
+            cp "$WORK/head.txt" "$WORK/scan.txt"
+          fi
+          echo "Scanning $(wc -l < "$WORK/scan.txt") of $(wc -l < "$WORK/head.txt") images."
+
+      # Each image is pulled for the runner's platform, or failing that for
+      # arm64 or amd64, since a catalog can hold images built for one
+      # architecture only. It is exported with `docker save` and osv-scanner
+      # reads the archive, so osv-scanner never pulls for the runner's platform
+      # itself; it reads layers and runs nothing. An image no platform can pull
+      # is reported as `unpullable`. osv-scanner
+      # exits 1 when it finds a vulnerability and 128 when an image has no
+      # packages it can read; both are results. Any other exit code is an
+      # error and fails the job. Each image is removed after its scan, so a
+      # long list does not fill the runner's disk.
+      - name: Scan the images
+        env:
+          MIN_SEVERITY: ${{ inputs.min-severity }}
+          FIXED_ONLY: ${{ inputs.fixed-only }}
+          WORK: ${{ runner.temp }}/image-scan
+          REPORT: ${{ runner.temp }}/report
+        run: |
+          mkdir -p "$REPORT"
+          : > "$WORK/findings.tsv"
+          cat > "$WORK/findings.jq" <<'JQ'
+          .results[]?.packages[]? as $entry
+          | ($entry.package.name) as $name
+          | ($entry.package.ecosystem // "") as $ecosystem
+          | $entry.groups[]?
+          | select(((.max_severity // "0") | tonumber? // 0) >= $min)
+          | . as $group
+          | ([$entry.vulnerabilities[]?
+              | select(.id as $id | $group.ids | index($id))
+              | .affected[]?
+              | select(.package.name == $name)
+              | select((.package.ecosystem // "") as $affected
+                  | ($affected | startswith($ecosystem)) or ($ecosystem | startswith($affected)))
+              | .ranges[]?.events[]?
+              | select(has("fixed"))] | length > 0) as $fixable
+          | select($fixable or ($fixed_only | not))
+          | [$image, $name, ($group.ids | sort | join(","))]
+          | @tsv
+          JQ
+          {
+            echo '## Image scan'
+            echo '| Image | Vulnerabilities | Packages in summary.txt |'
+            echo '|---|---|---|'
+          } >> "$GITHUB_STEP_SUMMARY"
+          save_failed() {
+            echo "docker save failed on $1" >&2
+            exit 1
+          }
+          export_image() {
+            local image="$1" archive="$2" platform
+            if docker pull -q "$image" >/dev/null 2>&1; then
+              docker save -o "$archive" "$image" || save_failed "$image"
+              return 0
+            fi
+            for platform in linux/arm64 linux/amd64; do
+              if docker pull -q --platform "$platform" "$image" >/dev/null 2>&1; then
+                docker save --platform "$platform" -o "$archive" "$image" || save_failed "$image"
+                return 0
+              fi
+            done
+            return 1
+          }
+          while read -r image; do
+            archive="$WORK/image.tar"
+            if ! export_image "$image" "$archive"; then
+              printf '%s\t-\tunpullable\n' "$image" >> "$WORK/findings.tsv"
+              echo "| \`$image\` | could not be pulled | - |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            report="$REPORT/$(printf '%s' "$image" | tr '/:@' '___').json"
+            status=0
+            osv-scanner scan image --archive --format json --output-file "$report" "$archive" || status=$?
+            rm -f "$archive"
+            docker image rm -f "$image" >/dev/null 2>&1 || true
+            case "$status" in
+              0 | 1 | 128) ;;
+              *) echo "osv-scanner failed on $image with exit code $status" >&2; exit "$status" ;;
+            esac
+            if [ ! -s "$report" ]; then
+              echo "| \`$image\` | no packages read | - |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            total=$(jq '[.results[]?.packages[]?.vulnerabilities[]?] | length' "$report")
+            jq -r --arg image "$image" --argjson min "$MIN_SEVERITY" --argjson fixed_only "$FIXED_ONLY" \
+              -f "$WORK/findings.jq" "$report" | sort -u > "$WORK/image-findings.tsv"
+            cat "$WORK/image-findings.tsv" >> "$WORK/findings.tsv"
+            packages=$(cut -f2 "$WORK/image-findings.tsv" | sort -u | wc -l)
+            echo "| \`$image\` | $total | $packages |" >> "$GITHUB_STEP_SUMMARY"
+          done < "$WORK/scan.txt"
+          jq -Rrs '
+            split("\n") | map(select(length > 0) | split("\t"))
+            | group_by([.[0], .[1]])
+            | map([.[0][0], .[0][1], (map(.[2] | split(",")) | add | unique | join(","))])
+            | .[] | @tsv' "$WORK/findings.tsv" | sort > "$REPORT/summary.txt"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/report
+          retention-days: 14

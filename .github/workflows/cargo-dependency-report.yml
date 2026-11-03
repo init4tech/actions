@@ -1,0 +1,106 @@
+name: 'Cargo Dependency Report'
+# Reports, for each Cargo workspace named, the RustSec advisories that match
+# its lockfile (cargo-deny) and the semver-compatible updates its lockfile
+# could take (`cargo update --dry-run`). Uploads a dependency report:
+# `summary.txt`, one stable line per advisory and per update, with the full
+# output of both tools beside it. Nothing is built and the lockfile is not
+# changed. The job reports and never fails on a finding.
+on:
+  workflow_call:
+    inputs:
+      manifests:
+        description: 'Space-separated Cargo.toml paths, one per workspace'
+        required: false
+        default: 'Cargo.toml'
+        type: string
+      deny-config:
+        description: 'cargo-deny config used for every workspace, so advisory ignores apply; skipped when the file does not exist'
+        required: false
+        default: 'deny.toml'
+        type: string
+      runs-on:
+        description: 'Runner, as JSON: a label string such as "ubuntu-latest", or an object such as {"group": "init4-runners"}'
+        required: false
+        default: '"ubuntu-latest"'
+        type: string
+      artifact-name:
+        description: 'Name of the uploaded report artifact'
+        required: false
+        default: 'dependency-report-cargo'
+        type: string
+      cargo-deny-version:
+        description: 'cargo-deny version to install'
+        required: false
+        default: '0.20.2'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-dependency-report:
+    name: Cargo dependency report
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned toolchain
+        run: |
+          if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then
+            rustup toolchain install
+          fi
+
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: cargo-deny@${{ inputs.cargo-deny-version }}
+
+      # cargo-deny exits non-zero when an advisory matches, which is a result.
+      # A non-zero exit with no diagnostic in its output is an error.
+      - name: Report advisories and updates
+        env:
+          MANIFESTS: ${{ inputs.manifests }}
+          DENY_CONFIG: ${{ inputs.deny-config }}
+          REPORT: ${{ runner.temp }}/report
+        run: |
+          mkdir -p "$REPORT"
+          : > "$REPORT/summary.txt"
+          config=()
+          if [ -f "$DENY_CONFIG" ]; then
+            config=(--config "$GITHUB_WORKSPACE/$DENY_CONFIG")
+          fi
+          for manifest in $MANIFESTS; do
+            workspace=$(dirname "$manifest" | tr '/' '_')
+            if [ "$workspace" = . ]; then workspace=root; fi
+            advisories="$REPORT/advisories-$workspace.jsonl"
+            updates="$REPORT/updates-$workspace.txt"
+
+            status=0
+            cargo deny --manifest-path "$manifest" "${config[@]}" --format json check advisories \
+              2> "$advisories" || status=$?
+            if [ "$status" -ne 0 ] && ! grep -q '"type":"diagnostic"' "$advisories"; then
+              cat "$advisories" >&2
+              exit "$status"
+            fi
+            jq -r --arg workspace "$workspace" '
+              select(.type == "diagnostic") | .fields | select(.advisory != null)
+              | ["advisory", $workspace, (.code // ""), .advisory.id, (.advisory.package // "")] | @tsv' \
+              "$advisories" >> "$REPORT/summary.txt"
+
+            cargo update --dry-run --manifest-path "$manifest" 2>&1 |
+              grep -E '^ *(Updating|Adding|Removing|Downgrading) [A-Za-z0-9_-]+ v' |
+              sed -E 's/^ +//' > "$updates" || true
+            sed "s/^/update\t$workspace\t/" "$updates" >> "$REPORT/summary.txt"
+          done
+          sort -u -o "$REPORT/summary.txt" "$REPORT/summary.txt"
+          {
+            echo '## Cargo dependency report'
+            echo "$(grep -c '^advisory' "$REPORT/summary.txt" || true) advisories, $(grep -c '^update' "$REPORT/summary.txt" || true) available updates."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/report
+          retention-days: 14

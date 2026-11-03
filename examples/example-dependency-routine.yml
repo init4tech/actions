@@ -1,0 +1,35 @@
+name: Supply Chain
+# Daily reports on what the repository depends on, and a summary issue with a
+# decision for each finding. Pull requests get the reports only.
+on:
+  pull_request:
+  schedule:
+    - cron: '30 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-audit:
+    uses: init4tech/actions/.github/workflows/workflow-audit.yml@<commit sha>
+
+  images:
+    uses: init4tech/actions/.github/workflows/image-scan.yml@<commit sha>
+    with:
+      list-command: grep -v -e '^#' -e '^$' .github/pinned-images.txt
+
+  cargo:
+    uses: init4tech/actions/.github/workflows/cargo-dependency-report.yml@<commit sha>
+
+  dependency-routine:
+    if: github.event_name != 'pull_request'
+    needs: [workflow-audit, images, cargo]
+    permissions:
+      contents: read
+      issues: write
+    uses: init4tech/actions/.github/workflows/dependency-routine.yml@<commit sha>
+    with:
+      context-file: .github/dependency-routine.md
+    secrets:
+      claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
