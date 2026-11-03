@@ -1,0 +1,210 @@
+name: 'Cargo Dependency Update'
+# Applies the adopt-now Cargo updates that dependency-routine.yml decided, and
+# opens or updates one pull request with them. No model runs here: the job
+# reads `decisions.json`, keeps only entries whose fields match strict
+# patterns and whose `from` version is the one locked, and runs
+# `cargo update -p <crate>@<from> --precise <to>` for each. Nothing is built.
+# The pull request goes through the repository's CI and merge rules like any
+# other.
+#
+# A pull request opened with the workflow's own token starts no CI, so give
+# the job a GitHub App (`app-client-id`, `app-private-key`) with contents and
+# pull-request write access. Without one it uses the workflow token, and the
+# pull request says that CI needs a manual start.
+on:
+  workflow_call:
+    inputs:
+      manifests:
+        description: 'Space-separated Cargo.toml paths the routine may update, as passed to cargo-dependency-report.yml'
+        required: false
+        default: 'Cargo.toml'
+        type: string
+      decisions-artifact:
+        description: 'Name of the artifact dependency-routine.yml uploaded decisions.json in'
+        required: false
+        default: 'dependency-decisions'
+        type: string
+      branch:
+        description: 'Branch the updates are pushed to; one pull request from it is kept up to date'
+        required: false
+        default: 'dependency-routine/cargo'
+        type: string
+      max-updates:
+        description: 'Most updates applied in one run; the rest wait for a later run'
+        required: false
+        default: 10
+        type: number
+      runs-on:
+        description: 'Runner, as JSON: a label string such as "ubuntu-latest", or an object such as {"group": "init4-runners"}'
+        required: false
+        default: '"ubuntu-latest"'
+        type: string
+    secrets:
+      app-client-id:
+        description: 'Client ID of a GitHub App with contents and pull-request write access, so CI runs on the pull request'
+        required: false
+      app-private-key:
+        description: 'Private key of that GitHub App'
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cargo-dependency-update:
+    name: Cargo dependency update
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ${{ inputs.decisions-artifact }}
+          path: ${{ runner.temp }}/decisions
+          merge-multiple: true
+
+      # Workspace names are those cargo-dependency-report.yml gives: the
+      # manifest's directory with `/` as `_`, or `root`.
+      - name: Choose the updates
+        id: plan
+        env:
+          MANIFESTS: ${{ inputs.manifests }}
+          MAX_UPDATES: ${{ inputs.max-updates }}
+          DECISIONS: ${{ runner.temp }}/decisions/decisions.json
+          PLAN: ${{ runner.temp }}/plan.tsv
+        run: |
+          : > "$PLAN"
+          if [ ! -f "$DECISIONS" ]; then
+            echo "No decisions this run."
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          workspaces=$(for manifest in $MANIFESTS; do
+            workspace=$(dirname "$manifest" | tr '/' '_')
+            if [ "$workspace" = . ]; then workspace=root; fi
+            printf '%s\t%s\n' "$workspace" "$manifest"
+          done | jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {(.[0]): .[1]}) | add // {}')
+          jq -r --argjson workspaces "$workspaces" --argjson max "$MAX_UPDATES" '
+            def version: test("^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$");
+            [.adopt_now[]?
+              | select(.kind == "cargo")
+              | select((.package | type) == "string" and (.package | test("^[A-Za-z0-9_-]{1,64}$")))
+              | select((.from | type) == "string" and (.from | version))
+              | select((.to | type) == "string" and (.to | version))
+              | select((.workspace | type) == "string" and ($workspaces[.workspace] != null))
+              | [$workspaces[.workspace], .package, .from, .to,
+                 ((.reason // "") | tostring | gsub("[\\r\\n\\t]"; " ") | gsub("@"; "(at)") | .[0:400])]]
+            | .[0:$max] | .[] | @tsv' "$DECISIONS" > "$PLAN"
+          listed=$(jq '[.adopt_now[]? | select(.kind == "cargo")] | length' "$DECISIONS")
+          count=$(wc -l < "$PLAN" | tr -d ' ')
+          echo "$count of $listed Cargo decisions passed validation."
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+      - if: steps.plan.outputs.count != '0'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - if: steps.plan.outputs.count != '0'
+        name: Install the pinned toolchain
+        run: |
+          if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then
+            rustup toolchain install
+          fi
+
+      # A crate whose locked version is no longer `from` was moved since the
+      # decision, so it is left for the next run to judge again.
+      - if: steps.plan.outputs.count != '0'
+        name: Apply the updates
+        id: apply
+        env:
+          PLAN: ${{ runner.temp }}/plan.tsv
+          APPLIED: ${{ runner.temp }}/applied.md
+        run: |
+          : > "$APPLIED"
+          while IFS=$'\t' read -r manifest package from to reason; do
+            lockfile="$(dirname "$manifest")/Cargo.lock"
+            if ! grep -A1 -x "name = \"$package\"" "$lockfile" | grep -qx "version = \"$from\""; then
+              echo "::warning::$package $from is not locked in $lockfile; skipped."
+              continue
+            fi
+            if cargo update --manifest-path "$manifest" -p "$package@$from" --precise "$to"; then
+              printf -- '- `%s` %s → %s in `%s`: %s\n' "$package" "$from" "$to" "$lockfile" "$reason" >> "$APPLIED"
+            else
+              echo "::warning::cargo update failed for $package $from -> $to in $manifest; skipped."
+            fi
+          done < "$PLAN"
+          changed=$(git status --porcelain -- '*Cargo.lock' | awk '{print $2}' | tr '\n' ' ')
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - if: steps.apply.outputs.changed != ''
+        name: Check for a GitHub App
+        id: app
+        env:
+          APP_CLIENT_ID: ${{ secrets.app-client-id }}
+          APP_PRIVATE_KEY: ${{ secrets.app-private-key }}
+        run: |
+          if [ -n "$APP_CLIENT_ID" ] && [ -n "$APP_PRIVATE_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No GitHub App configured; the pull request is opened with the workflow token and CI will not start on it."
+          fi
+
+      - if: steps.app.outputs.configured == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.app-client-id }}
+          private-key: ${{ secrets.app-private-key }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # The commit is made through the API without an author, so GitHub signs
+      # it for the token's identity, as a branch rule requiring signatures needs.
+      - if: steps.apply.outputs.changed != ''
+        name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          USES_APP: ${{ steps.app-token.outputs.token != '' }}
+          REPOSITORY: ${{ github.repository }}
+          BASE: ${{ github.event.repository.default_branch }}
+          BRANCH: ${{ inputs.branch }}
+          CHANGED: ${{ steps.apply.outputs.changed }}
+          APPLIED: ${{ runner.temp }}/applied.md
+        run: |
+          head=$(git rev-parse HEAD)
+          base_tree=$(gh api "repos/$REPOSITORY/git/commits/$head" --jq .tree.sha)
+          entries="[]"
+          for path in $CHANGED; do
+            blob=$(jq -n --rawfile content "$path" '{content: $content, encoding: "utf-8"}' |
+              gh api "repos/$REPOSITORY/git/blobs" --input - --jq .sha)
+            entries=$(jq -c --arg path "$path" --arg sha "$blob" \
+              '. + [{path: $path, mode: "100644", type: "blob", sha: $sha}]' <<<"$entries")
+          done
+          tree=$(jq -n --arg base "$base_tree" --argjson entries "$entries" '{base_tree: $base, tree: $entries}' |
+            gh api "repos/$REPOSITORY/git/trees" --input - --jq .sha)
+          title="deps(cargo): take the updates the dependency routine adopted"
+          commit=$(jq -n --arg message "$title" --arg tree "$tree" --arg parent "$head" \
+            '{message: $message, tree: $tree, parents: [$parent]}' |
+            gh api "repos/$REPOSITORY/git/commits" --input - --jq .sha)
+          if gh api "repos/$REPOSITORY/git/ref/heads/$BRANCH" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$REPOSITORY/git/refs/heads/$BRANCH" -f "sha=$commit" -F force=true >/dev/null
+          else
+            gh api "repos/$REPOSITORY/git/refs" -f "ref=refs/heads/$BRANCH" -f "sha=$commit" >/dev/null
+          fi
+          {
+            echo "The dependency routine decided to adopt these Cargo updates now. Each reason is its own; the evidence is in the summary issue."
+            echo
+            cat "$APPLIED"
+            echo
+            echo "Applied with \`cargo update --precise\`; nothing was built. CI and the merge rules decide whether it lands."
+            if [ "$USES_APP" != true ]; then
+              echo
+              echo "Opened with the workflow's own token, which starts no CI. Close and reopen this pull request to run it."
+            fi
+          } > "$RUNNER_TEMP/body.md"
+          number=$(gh pr list --repo "$REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --repo "$REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --repo "$REPOSITORY" --base "$BASE" --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          fi

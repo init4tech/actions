@@ -1,0 +1,72 @@
+name: 'Workflow Audit'
+# Audits the calling repository's GitHub Actions workflows with zizmor and
+# uploads a dependency report: `summary.txt`, one stable line per finding, and
+# `zizmor.json`, the full output. The job reports and never fails on a finding.
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: 'Runner, as JSON: a label string such as "ubuntu-latest", or an object such as {"group": "init4-runners"}'
+        required: false
+        default: '"ubuntu-latest"'
+        type: string
+      path:
+        description: 'Directory of workflows to audit'
+        required: false
+        default: '.github/workflows'
+        type: string
+      artifact-name:
+        description: 'Name of the uploaded report artifact'
+        required: false
+        default: 'dependency-report-workflows'
+        type: string
+      zizmor-version:
+        description: 'zizmor version to install'
+        required: false
+        default: '1.31.1'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-audit:
+    name: Workflow audit
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          tool: zizmor@${{ inputs.zizmor-version }}
+
+      # The token lets zizmor's online audits check that each pinned commit
+      # belongs to its action's repository and has no known advisory.
+      - name: Audit the workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOWS: ${{ inputs.path }}
+          REPORT: ${{ runner.temp }}/report
+        run: |
+          mkdir -p "$REPORT"
+          zizmor --no-exit-codes --format json "$WORKFLOWS" > "$REPORT/zizmor.json"
+          jq -r '.[] | [
+              .ident,
+              .determinations.severity,
+              ((.locations[0].symbolic.key.Local.verbatim_path // "?")
+                + ":" + ((.locations[0].concrete.location.start_point.row // -1) + 1 | tostring))
+            ] | @tsv' "$REPORT/zizmor.json" | sort -u > "$REPORT/summary.txt"
+          {
+            echo '## Workflow audit'
+            echo '```'
+            zizmor --no-exit-codes --format plain "$WORKFLOWS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ runner.temp }}/report
+          retention-days: 14
