@@ -267,7 +267,7 @@ jobs:
         with:
           name: ${{ inputs.decisions-artifact }}
           path: ${{ runner.temp }}/decisions/decisions.json
-          retention-days: 14
+          retention-days: 1
 
       - if: failure() && steps.gate.outputs.run == 'true'
         name: Report an unfinished run

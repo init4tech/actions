@@ -2,7 +2,8 @@ name: 'Image Scan'
 # Scans container images with osv-scanner and uploads a dependency report:
 # `summary.txt`, one stable line per image and package with the ids of its
 # vulnerabilities at or above `min-severity` that a fixed version resolves,
-# and one JSON report per image with every finding. The calling repository
+# and one JSON report per image with every finding, each with only the
+# affected entries of its own package and ecosystem. The calling repository
 # supplies the images as a command that prints one reference per line, ideally
 # pinned by digest. On a pull request the job scans only the references the
 # command prints at the head and not at the base, the images the PR starts
@@ -115,7 +116,9 @@ jobs:
       # exits 1 when it finds a vulnerability and 128 when an image has no
       # packages it can read; both are results. Any other exit code is an
       # error and fails the job. Each image is removed after its scan, so a
-      # long list does not fill the runner's disk.
+      # long list does not fill the runner's disk. Each report keeps, in each
+      # vulnerability, only the affected entries of the package and ecosystem
+      # it was found in; the full advisories can make one report a gigabyte.
       - name: Scan the images
         env:
           MIN_SEVERITY: ${{ inputs.min-severity }}
@@ -125,20 +128,26 @@ jobs:
         run: |
           mkdir -p "$REPORT"
           : > "$WORK/findings.tsv"
+          cat > "$WORK/report.jq" <<'JQ'
+          def own($name; $ecosystem):
+            .package.name == $name
+            and ((.package.ecosystem // "") as $affected
+              | ($affected | startswith($ecosystem)) or ($ecosystem | startswith($affected)));
+          .results[]?.packages[]? |= (
+            .package.name as $name
+            | (.package.ecosystem // "") as $ecosystem
+            | del(.vulnerabilities[]?.affected[]? | select(own($name; $ecosystem) | not))
+          )
+          JQ
           cat > "$WORK/findings.jq" <<'JQ'
           .results[]?.packages[]? as $entry
           | ($entry.package.name) as $name
-          | ($entry.package.ecosystem // "") as $ecosystem
           | $entry.groups[]?
           | select(((.max_severity // "0") | tonumber? // 0) >= $min)
           | . as $group
           | ([$entry.vulnerabilities[]?
               | select(.id as $id | $group.ids | index($id))
-              | .affected[]?
-              | select(.package.name == $name)
-              | select((.package.ecosystem // "") as $affected
-                  | ($affected | startswith($ecosystem)) or ($ecosystem | startswith($affected)))
-              | .ranges[]?.events[]?
+              | .affected[]?.ranges[]?.events[]?
               | select(has("fixed"))] | length > 0) as $fixable
           | select($fixable or ($fixed_only | not))
           | [$image, $name, ($group.ids | sort | join(","))]
@@ -187,6 +196,8 @@ jobs:
               echo "| \`$image\` | no packages read | - |" >> "$GITHUB_STEP_SUMMARY"
               continue
             fi
+            jq -f "$WORK/report.jq" "$report" > "$WORK/report.json"
+            mv "$WORK/report.json" "$report"
             total=$(jq '[.results[]?.packages[]?.vulnerabilities[]?] | length' "$report")
             jq -r --arg image "$image" --argjson min "$MIN_SEVERITY" --argjson fixed_only "$FIXED_ONLY" \
               -f "$WORK/findings.jq" "$report" | sort -u > "$WORK/image-findings.tsv"
@@ -204,4 +215,4 @@ jobs:
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ runner.temp }}/report
-          retention-days: 14
+          retention-days: 1
