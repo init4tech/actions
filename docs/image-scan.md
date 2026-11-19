@@ -25,7 +25,9 @@ It uploads a dependency report and never fails on a finding. The report holds:
   `min-severity` that a fixed version of the package resolves; a package with
   none has no line. An image that could not be pulled has the line
   `image<TAB>-<TAB>unpullable`.
-- One osv-scanner JSON report per image, with every finding.
+- One osv-scanner JSON report per image, with every finding. Each finding keeps
+  only the affected entries of its own package and ecosystem, which hold the
+  fixed versions that `summary.txt` reads.
 
 A line per image and package is one thing a person can act on: rebuild or
 re-pin the image so the package is at its fixed version. A vulnerability with
