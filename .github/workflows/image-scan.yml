@@ -204,4 +204,4 @@ jobs:
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ runner.temp }}/report
-          retention-days: 14
+          retention-days: 1
